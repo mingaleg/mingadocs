@@ -6,6 +6,7 @@ guessed - trust them over datasheet round numbers.
 """
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 
@@ -77,7 +78,7 @@ class LabelTemplate:
             self.label_height - 2 * self.safe_inset,
         )
 
-    def positions(self):
+    def positions(self) -> Iterator[tuple[int, int, int]]:
         """Yield ``(index, col, row)`` in row-major fill order."""
         i = 0
         for row in range(self.rows):

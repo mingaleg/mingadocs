@@ -3,11 +3,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from typing import Any
 
 from django.conf import settings
 
 from .arn import continuation_page_arns, volume_page_arns
-from .label_templates import TEMPLATES
+from .label_templates import TEMPLATES, LabelTemplate
 from .models import VolumeAllocation
 from .pdf import render_sheet
 
@@ -15,7 +16,7 @@ PAGE_VOLUME = "volume"
 PAGE_CONTINUATION = "continuation"
 
 
-def current_template():
+def current_template() -> LabelTemplate:
     return TEMPLATES[settings.LABEL_TEMPLATE]
 
 
@@ -26,7 +27,7 @@ def latest_volume(year: int) -> VolumeAllocation | None:
     )
 
 
-def suggest_volume_defaults() -> dict:
+def suggest_volume_defaults() -> dict[str, int]:
     """Auto-population for the volume-page form (all user-overridable)."""
     year = date.today().year
     last = latest_volume(year)
@@ -44,7 +45,7 @@ class Sheet:
     max_index: int
 
 
-def build_sheet(cleaned: dict, prefix: str) -> Sheet:
+def build_sheet(cleaned: dict[str, Any], prefix: str) -> Sheet:
     """Build one full sheet. The document index always runs 0..sheet capacity,
     so ``max_index`` is dictated by the label template, not the user."""
     template = current_template()

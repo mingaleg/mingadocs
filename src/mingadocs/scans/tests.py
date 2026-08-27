@@ -3,6 +3,9 @@
 Jobs are exercised synchronously (``jobs._run_scan`` / ``jobs._run_ocr`` called
 directly); the scanner is faked via ``MINGADOCS_FAKE_SCANNER``.
 """
+# Test code legitimately reaches into private job helpers and keeps temp files
+# open past the enclosing block.
+# pylint: disable=protected-access,consider-using-with
 from __future__ import annotations
 
 import io
@@ -13,8 +16,6 @@ from unittest import mock
 import zxingcpp
 from django.test import TestCase, override_settings
 from PIL import Image
-
-from arnlabels.models import PrintSettings
 
 from . import jobs, ocr, services
 from . import scanner as scanner_mod
@@ -29,7 +30,10 @@ def make_page_png(*arns: str, blank: bool = False) -> bytes:
         y = 40
         for value in arns:
             bc = zxingcpp.create_barcode(value, zxingcpp.BarcodeFormat.Code128)
-            strip = Image.fromarray(zxingcpp.write_barcode_to_image(bc))
+            # zxingcpp.Image exposes __array_interface__ but its stub does not
+            # satisfy Pillow's SupportsArrayInterface protocol.
+            img_arr = zxingcpp.write_barcode_to_image(bc)
+            strip = Image.fromarray(img_arr)  # type: ignore[arg-type]
             strip = strip.resize((600, 160))
             canvas.paste(strip, (60, y))
             y += 260
@@ -65,13 +69,12 @@ class OcrPipelineTests(TestCase):
 
     def test_falls_back_to_other_binarizers(self):
         """A Code 128 only the fixed-threshold binarizer sees is still found."""
-        import zxingcpp
         real = zxingcpp.read_barcodes
 
-        def picky(img, *a, binarizer=None, **kw):
+        def picky(img, *, binarizer=None, **kw):
             if binarizer == zxingcpp.Binarizer.LocalAverage:
                 return []
-            return real(img, *a, binarizer=binarizer, **kw)
+            return real(img, binarizer=binarizer, **kw)
 
         with mock.patch.object(zxingcpp, "read_barcodes", side_effect=picky):
             r = ocr.detect_arn(make_page_png("ARN202600042"), "ARN")
@@ -98,7 +101,7 @@ class ScannerTests(TestCase):
     def test_retries_with_fewer_options_on_failure(self):
         calls = []
 
-        def fake_run(cmd, **kw):
+        def fake_run(cmd, **_kw):
             calls.append(cmd)
             if "--mode=Color" in cmd:
                 return mock.Mock(returncode=1, stdout=b"",

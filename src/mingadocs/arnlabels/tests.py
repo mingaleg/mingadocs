@@ -72,7 +72,7 @@ class TemplateGeometryTests(TestCase):
 
     def test_safe_box_inside_label(self):
         lx, ly = T.label_origin(3, 4)
-        sx, sy, sw, sh = T.safe_box(3, 4)
+        sx, sy, sw, _sh = T.safe_box(3, 4)
         self.assertGreater(sx, lx)
         self.assertGreater(sy, ly)
         self.assertLess(sw, T.label_width)

@@ -10,12 +10,13 @@ class ScansConfig(AppConfig):
         # request so we never touch the DB during app initialization.
         from django.core.signals import request_started
 
-        def _recover(*args, **kwargs):
+        def _recover(*args: object, **kwargs: object) -> None:
             request_started.disconnect(_recover, dispatch_uid="scans_recover_stale")
+            # Must never break request handling.
             try:
                 from . import jobs
                 jobs.recover_stale()
-            except Exception:  # noqa: BLE001 - never break request handling
+            except Exception:  # noqa: BLE001  # nosec B110
                 pass
 
         request_started.connect(

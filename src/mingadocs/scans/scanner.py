@@ -7,6 +7,10 @@ from __future__ import annotations
 
 import os
 import subprocess
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .models import ScanSettings
 
 FAKE_SCANNER_ENV = "MINGADOCS_FAKE_SCANNER"
 
@@ -21,14 +25,16 @@ def list_devices() -> list[str]:
     Network backends (escl / hpaio) make this slow, so give it a generous
     timeout and parse whatever came back regardless of exit status.
     """
+    # Fixed argv; scanimage is a system tool resolved via PATH.
+    argv = ["scanimage", "-L"]
     try:
-        out = subprocess.run(
-            ["scanimage", "-L"],
-            capture_output=True, text=True, timeout=90,
-        ).stdout
+        proc = subprocess.run(  # nosec B603
+            argv, capture_output=True, text=True, timeout=90, check=False,
+        )
     except Exception:  # noqa: BLE001 - degrade gracefully for the settings UI
         return []
-    devices = []
+    out = proc.stdout
+    devices: list[str] = []
     for line in out.splitlines():
         line = line.strip()
         if line.startswith("device `") and "'" in line[8:]:
@@ -42,8 +48,8 @@ def list_devices() -> list[str]:
     return devices
 
 
-def scan_page(cfg) -> bytes:
-    """Acquire one page as PNG bytes. ``cfg`` is a ``ScanSettings`` instance."""
+def scan_page(cfg: ScanSettings) -> bytes:
+    """Acquire one page as PNG bytes."""
     fake = os.environ.get(FAKE_SCANNER_ENV)
     if fake:
         try:
@@ -58,8 +64,8 @@ def scan_page(cfg) -> bytes:
     # Try with resolution+mode, then drop mode, then drop everything: backends
     # differ in which option names/values they accept, and a bad value fails
     # late with "sane_start: Invalid argument" rather than a parse error.
-    opt_sets = []
-    full = []
+    opt_sets: list[list[str]] = []
+    full: list[str] = []
     if cfg.resolution_dpi:
         full += [f"--resolution={cfg.resolution_dpi}"]
     if cfg.mode:
@@ -108,9 +114,11 @@ def _looks_like_image(data: bytes) -> bool:
                 or head.startswith(b"<?xml"))
 
 
-def _run(cmd: list[str]) -> subprocess.CompletedProcess:
+def _run(cmd: list[str]) -> subprocess.CompletedProcess[bytes]:
+    # cmd is built by the caller from a fixed template plus validated config
+    # values (device name, integer dpi, mode word) — never shell input.
     try:
-        return subprocess.run(cmd, capture_output=True, timeout=300)
+        return subprocess.run(cmd, capture_output=True, timeout=300, check=False)  # nosec B603
     except FileNotFoundError as exc:
         raise ScannerError("scanimage not installed (sane-utils)") from exc
     except subprocess.TimeoutExpired as exc:

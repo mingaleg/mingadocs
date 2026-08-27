@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from django import forms
 
 from arnlabels.arn import Arn
@@ -13,7 +15,9 @@ class ScanSettingsForm(forms.ModelForm):
         model = ScanSettings
         fields = ["sane_device", "resolution_dpi", "mode", "ocr_timeout_seconds"]
 
-    def __init__(self, *args, devices=None, **kwargs):
+    def __init__(
+        self, *args: Any, devices: list[str] | None = None, **kwargs: Any
+    ) -> None:
         super().__init__(*args, **kwargs)
         if devices:
             current = self.instance.sane_device
@@ -45,7 +49,7 @@ class PageArnForm(forms.Form):
     arn_volume = forms.CharField(required=False)
     arn_index = forms.CharField(required=False)
 
-    def _part(self, cleaned, field, label):
+    def _part(self, cleaned: dict[str, Any], field: str, label: str) -> int | None:
         raw = (cleaned.get(field) or "").strip()
         try:
             return int(raw)
@@ -53,14 +57,14 @@ class PageArnForm(forms.Form):
             self.add_error(field, f"{label} must be a number")
             return None
 
-    def clean(self):
-        cleaned = super().clean()
+    def clean(self) -> dict[str, Any]:
+        cleaned: dict[str, Any] = super().clean() or {}
         if cleaned.get("mode") == self.MODE_ARN:
             prefix = PrintSettings.get_solo().arn_prefix
             year = self._part(cleaned, "arn_year", "Year")
             volume = self._part(cleaned, "arn_volume", "Volume")
             index = self._part(cleaned, "arn_index", "Index")
-            if None not in (year, volume, index):
+            if year is not None and volume is not None and index is not None:
                 try:
                     arn = Arn.volume_start(prefix, year, volume, index)
                 except ValueError as exc:

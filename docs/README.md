@@ -66,3 +66,17 @@ Without a scanner, set `MINGADOCS_FAKE_SCANNER=/path/to/image.png` and every
 
 Templates extend `arnlabels/base.html`; styling is one stylesheet at
 `arnlabels/static/arnlabels/app.css` (light/dark aware, no build step).
+
+## Static analysis
+
+`make lint` runs three checkers; all are expected to pass with zero findings
+(config lives in `pyproject.toml`):
+
+| Tool     | `make` target | Scope |
+|----------|---------------|-------|
+| `mypy`   | `make mypy`   | `src/mingadocs` + `tools/`, with `django-stubs`; migrations excluded. Full annotations required (`disallow_untyped_defs`); tests are checked but not annotation-gated. |
+| `pylint` | `make pylint` | Same source, `pylint-django` plugin. `broad-exception-caught` is disabled project-wide (deliberate degrade-gracefully handlers, each also tagged `# noqa: BLE001`). |
+| `bandit` | `make bandit` | `src/mingadocs`. Reviewed subprocess / try-except sites carry inline `# nosec <ID>`. |
+
+Third-party packages without type info (`cups`, `reportlab`, `solo`) are given
+`ignore_missing_imports`; `zxing-cpp` ships its own stubs.

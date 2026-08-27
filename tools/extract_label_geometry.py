@@ -24,7 +24,8 @@ PT_PER_MM = 72.0 / 25.4
 
 
 def main(path: str) -> None:
-    s = open(path).read()
+    with open(path, encoding="utf-8") as fh:
+        s = fh.read()
 
     cells = sorted(
         (int(i), float(tx), float(ty))
@@ -40,13 +41,14 @@ def main(path: str) -> None:
     pm = re.search(
         r'dpo8-final-preview-page-0" width="([\d.]+)" height="([\d.]+)"', s
     )
-    page_w, page_h = (float(v) for v in pm.groups())
-
     lm = re.search(
         r'default-background-0-0-drag-rect" x="0" y="0" '
         r'width="([\d.]+)" height="([\d.]+)"',
         s,
     )
+    if pm is None or lm is None:
+        sys.exit("page / label rectangle not found in the SVG")
+    page_w, page_h = (float(v) for v in pm.groups())
     lab_w, lab_h = (float(v) for v in lm.groups())
 
     xs = sorted({round(c[1], 3) for c in cells})

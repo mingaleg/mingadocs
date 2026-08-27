@@ -8,6 +8,7 @@ It edits two django-solo singletons that live in their own domain apps:
 from __future__ import annotations
 
 from django.contrib import messages
+from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
@@ -19,7 +20,7 @@ from scans.models import ScanSettings
 from . import probe
 
 
-def settings_page(request):
+def settings_page(request: HttpRequest) -> HttpResponse:
     """Label printing + scanner settings, one ``<section>`` each."""
     print_config = PrintSettings.get_solo()
     scan_config = ScanSettings.get_solo()

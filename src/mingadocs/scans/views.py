@@ -4,21 +4,23 @@ from __future__ import annotations
 import datetime
 import json
 from collections import Counter
+from collections.abc import Iterable
+from typing import Any
 
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from . import services
-from .forms import PageArnForm
 from arnlabels.models import PrintSettings
 
+from . import services
+from .forms import PageArnForm
 from .models import Document, ScanBatch, ScanPage
 
 
-def _page_json(page: ScanPage, arn_label: str | None = None) -> dict:
+def _page_json(page: ScanPage, arn_label: str | None = None) -> dict[str, Any]:
     arn = page.effective_arn
     human = arn.human_readable() if arn else ""
     return {
@@ -39,7 +41,7 @@ def _page_json(page: ScanPage, arn_label: str | None = None) -> dict:
     }
 
 
-def _arn_labels(pages) -> dict[int, str]:
+def _arn_labels(pages: Iterable[ScanPage]) -> dict[int, str]:
     """Map page id -> display label, numbering continuation pages within a doc."""
     labels: dict[int, str] = {}
     doc_page = 0
@@ -56,7 +58,7 @@ def _arn_labels(pages) -> dict[int, str]:
     return labels
 
 
-def _status_payload(batch: ScanBatch) -> dict:
+def _status_payload(batch: ScanBatch) -> dict[str, Any]:
     alerts = services.compute_alerts(batch)
     pages = list(batch.pages.all())
     labels = _arn_labels(pages)
@@ -73,7 +75,7 @@ def _status_payload(batch: ScanBatch) -> dict:
     }
 
 
-def batch_list(request):
+def batch_list(request: HttpRequest) -> HttpResponse:
     return render(request, "scans/batch_list.html", {
         "nav": "scans",
         "active": ScanBatch.objects.exclude(status=ScanBatch.FINALIZED),
@@ -82,19 +84,19 @@ def batch_list(request):
     })
 
 
-def document_list(request):
+def document_list(request: HttpRequest) -> HttpResponse:
     return render(request, "scans/document_list.html", {
         "nav": "documents", "documents": Document.objects.all(),
     })
 
 
 @require_POST
-def new_batch(request):
+def new_batch(request: HttpRequest) -> HttpResponse:
     batch = services.start_batch()
     return redirect("scans:console", batch_id=batch.id)
 
 
-def batch_console(request, batch_id):
+def batch_console(request: HttpRequest, batch_id: int) -> HttpResponse:
     batch = get_object_or_404(ScanBatch, pk=batch_id)
     if batch.status == ScanBatch.REVIEW:
         return redirect("scans:review", batch_id=batch.id)
@@ -106,7 +108,7 @@ def batch_console(request, batch_id):
     })
 
 
-def batch_review(request, batch_id):
+def batch_review(request: HttpRequest, batch_id: int) -> HttpResponse:
     batch = get_object_or_404(ScanBatch, pk=batch_id)
     if batch.status == ScanBatch.SCANNING:
         return redirect("scans:console", batch_id=batch.id)
@@ -116,13 +118,13 @@ def batch_review(request, batch_id):
     })
 
 
-def batch_status(request, batch_id):
+def batch_status(request: HttpRequest, batch_id: int) -> HttpResponse:
     batch = get_object_or_404(ScanBatch, pk=batch_id)
     return JsonResponse(_status_payload(batch))
 
 
 @require_POST
-def scan_page(request, batch_id):
+def scan_page(request: HttpRequest, batch_id: int) -> HttpResponse:
     batch = get_object_or_404(ScanBatch, pk=batch_id)
     try:
         page = services.add_scan_page(batch)
@@ -132,7 +134,7 @@ def scan_page(request, batch_id):
 
 
 @require_POST
-def stop_batch(request, batch_id):
+def stop_batch(request: HttpRequest, batch_id: int) -> HttpResponse:
     batch = get_object_or_404(ScanBatch, pk=batch_id)
     services.stop_batch(batch)
     url = reverse("scans:review", args=[batch.id])
@@ -142,7 +144,7 @@ def stop_batch(request, batch_id):
 
 
 @require_POST
-def discard_batch(request, batch_id):
+def discard_batch(request: HttpRequest, batch_id: int) -> HttpResponse:
     batch = get_object_or_404(ScanBatch, pk=batch_id)
     try:
         services.discard_batch(batch)
@@ -156,7 +158,7 @@ def discard_batch(request, batch_id):
 
 
 @require_POST
-def reorder(request, batch_id):
+def reorder(request: HttpRequest, batch_id: int) -> HttpResponse:
     batch = get_object_or_404(ScanBatch, pk=batch_id)
     try:
         ids = json.loads(request.body)["ids"]
@@ -167,7 +169,7 @@ def reorder(request, batch_id):
 
 
 @require_POST
-def finalize(request, batch_id):
+def finalize(request: HttpRequest, batch_id: int) -> HttpResponse:
     batch = get_object_or_404(ScanBatch, pk=batch_id)
     try:
         docs = services.finalize_batch(batch)
@@ -180,7 +182,7 @@ def finalize(request, batch_id):
     return JsonResponse({"redirect": reverse("scans:batch-list")})
 
 
-def page_detail(request, batch_id, page_id):
+def page_detail(request: HttpRequest, batch_id: int, page_id: int) -> HttpResponse:
     page = get_object_or_404(ScanPage, pk=page_id, batch_id=batch_id)
     prefix = PrintSettings.get_solo().arn_prefix
     manual_year = str(datetime.date.today().year)
@@ -195,7 +197,7 @@ def page_detail(request, batch_id, page_id):
     if not manual_volume:
         # Pre-fill the volume from the other pages in the batch if a strict
         # majority of the resolved volume-start pages agree.
-        vols = Counter()
+        vols: Counter[str] = Counter()
         for other in page.batch.pages.all():
             a = other.effective_arn
             if a and not a.is_continuation:
@@ -220,7 +222,7 @@ def page_detail(request, batch_id, page_id):
 
 
 @require_POST
-def page_arn(request, batch_id, page_id):
+def page_arn(request: HttpRequest, batch_id: int, page_id: int) -> HttpResponse:
     page = get_object_or_404(ScanPage, pk=page_id, batch_id=batch_id)
     form = PageArnForm(request.POST)
     if not form.is_valid():
@@ -242,7 +244,7 @@ def page_arn(request, batch_id, page_id):
 
 
 @require_POST
-def page_remove(request, batch_id, page_id):
+def page_remove(request: HttpRequest, batch_id: int, page_id: int) -> HttpResponse:
     page = get_object_or_404(ScanPage, pk=page_id, batch_id=batch_id)
     services.remove_page(page)
     return JsonResponse({"ok": True})

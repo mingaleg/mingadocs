@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import io
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 import zxingcpp
 from PIL import Image
+
+_CODE128 = zxingcpp.BarcodeFormats(zxingcpp.BarcodeFormat.Code128)
 
 
 @dataclass
@@ -54,7 +57,7 @@ _TILES_Y = 3
 _TILE_OVERLAP = 0.12
 
 
-def _regions(img: Image.Image):
+def _regions(img: Image.Image) -> Iterator[Image.Image]:
     yield img
     w, h = img.size
     ox, oy = int(w * _TILE_OVERLAP), int(h * _TILE_OVERLAP)
@@ -76,11 +79,11 @@ def _scan_code128(img: Image.Image, prefix: str) -> set[str]:
             try:
                 results = zxingcpp.read_barcodes(
                     region,
-                    formats=zxingcpp.BarcodeFormat.Code128,
+                    formats=_CODE128,
                     binarizer=binarizer,
                 )
-            except Exception:  # noqa: BLE001 - a bad pass must not sink detection
-                continue
+            except Exception:  # noqa: BLE001  # nosec B112
+                continue  # one bad binarizer pass must not sink detection
             for r in results:
                 if r.text.startswith(prefix):
                     found.add(r.text)

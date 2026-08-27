@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from django.contrib import messages
-from django.http import HttpResponse
+from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
@@ -14,7 +14,7 @@ from .models import PrintSettings, VolumeAllocation
 from .services import PAGE_VOLUME
 
 
-def index(request):
+def index(request: HttpRequest) -> HttpResponse:
     """Landing page: current configuration and recent volume / scan activity."""
     config = PrintSettings.get_solo()
     active_batches = ScanBatch.objects.exclude(status=ScanBatch.FINALIZED)
@@ -36,7 +36,7 @@ def index(request):
     )
 
 
-def label_utility(request):
+def label_utility(request: HttpRequest) -> HttpResponse:
     """GET: show the batch form (volume fields auto-populated).
     POST: generate the sheet and either submit to CUPS or return a PDF."""
     config = PrintSettings.get_solo()
@@ -92,7 +92,7 @@ def label_utility(request):
             }
         )
 
-    last_by_year = {}
+    last_by_year: dict[int, dict[str, str]] = {}
     for a in VolumeAllocation.objects.order_by("year", "volume"):
         last_by_year[a.year] = {
             "volume": f"{a.volume:02d}",
@@ -118,6 +118,6 @@ def label_utility(request):
     )
 
 
-def print_settings(request):
+def print_settings(request: HttpRequest) -> HttpResponse:
     """Old URL — label settings now live on the unified settings page."""
     return redirect(reverse("siteconfig:settings") + "#labels")

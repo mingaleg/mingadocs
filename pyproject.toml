@@ -19,3 +19,89 @@ dependencies = [
 [tool.poetry]
 # Application, not a distributable library: don't install the project itself.
 package-mode = false
+
+[dependency-groups]
+dev = [
+    "mypy (>=2.3.1,<3.0.0)",
+    "pylint (>=4.0.7,<5.0.0)",
+    "bandit (>=1.9.4,<2.0.0)",
+    "django-stubs (>=6.1.0,<7.0.0)",
+    "pylint-django (>=2.8.0,<3.0.0)"
+]
+
+# --------------------------------------------------------------------------
+# Static analysis. Run all three with `make lint` (or individually:
+# `make mypy` / `make pylint` / `make bandit`). The source root lives under
+# src/mingadocs/, so every tool is pointed there and told where Django's
+# settings module is.
+# --------------------------------------------------------------------------
+
+[tool.mypy]
+python_version = "3.14"
+mypy_path = "src/mingadocs"
+explicit_package_bases = true
+namespace_packages = true
+plugins = ["mypy_django_plugin.main"]
+check_untyped_defs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_unused_configs = true
+strict_equality = true
+extra_checks = true
+exclude = ['/migrations/', '/manage\.py$']
+
+[[tool.mypy.overrides]]
+# Third-party packages that ship no type information.
+module = ["cups", "zxingcpp", "solo.*", "reportlab.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Tests exercise a lot of Django/3rd-party surface; keep them checked but do
+# not demand full annotations on every fixture helper.
+module = ["*.tests"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+[tool.django-stubs]
+django_settings_module = "config.settings"
+
+[tool.pylint.main]
+load-plugins = ["pylint_django"]
+django-settings-module = "config.settings"
+init-hook = "import sys; sys.path.insert(0, 'src/mingadocs')"
+ignore = ["migrations"]
+extension-pkg-allow-list = ["cups", "zxingcpp"]
+jobs = 0
+
+[tool.pylint.basic]
+good-names = ["i", "j", "k", "n", "x", "y", "c", "im", "ex", "fh", "fd", "fn", "r", "a", "b", "e"]
+
+[tool.pylint."messages control"]
+disable = [
+    "missing-module-docstring",
+    "missing-function-docstring",
+    "missing-class-docstring",
+    "too-few-public-methods",
+    "duplicate-code",
+    "import-outside-toplevel",
+    # Deliberate: several handlers catch Exception to degrade gracefully / never
+    # break request handling. Each is marked with `# noqa: BLE001` at the site.
+    "broad-exception-caught",
+]
+
+[tool.pylint.format]
+max-line-length = 100
+
+[tool.pylint.design]
+max-args = 8
+max-attributes = 20
+max-locals = 20
+
+[tool.bandit]
+exclude_dirs = ["src/mingadocs/tests", "tools"]
+# B101 assert: only used in tests. B404/B603: subprocess use is deliberate and
+# argument lists are fully controlled (see scans/scanner.py).
+skips = ["B101", "B404"]

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import io
 import logging
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 
 from django.core.files.base import ContentFile
@@ -39,7 +40,7 @@ def enqueue_ocr(page_id: int) -> None:
     _OCR_POOL.submit(_task, _run_ocr, page_id)
 
 
-def _task(fn, page_id: int) -> None:
+def _task(fn: Callable[[int], None], page_id: int) -> None:
     """Wrapper: never let a worker thread die silently, always tidy up conns."""
     try:
         fn(page_id)

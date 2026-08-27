@@ -157,7 +157,7 @@ def finalizable(batch: ScanBatch) -> bool:
 # --- finalize ----------------------------------------------------------------
 
 def _pages_to_pdf(pages: list[ScanPage]) -> bytes:
-    images = []
+    images: list[Image.Image] = []
     for page in pages:
         im = Image.open(page.image.open("rb"))
         im.load()
@@ -176,6 +176,8 @@ def finalize_batch(batch: ScanBatch) -> list[Document]:
     groups: list[tuple[Arn, list[ScanPage]]] = []
     for page in pages:
         arn = page.effective_arn
+        if arn is None:  # unreachable: finalizable() rules this out
+            raise ValueError(f"page {page.position} has no effective ARN")
         if not arn.is_continuation:
             groups.append((arn, [page]))
         else:
