@@ -158,7 +158,8 @@ Editable on `/labels/settings/` and in the Django admin.
 | `arnlabels/printing.py`       | CUPS integration (list queues, submit job) |
 | `arnlabels/services.py`       | Auto-population, sheet building, allocation recording |
 | `arnlabels/forms.py`          | Settings form + label batch form |
-| `arnlabels/views.py`          | `/labels/` utility page, `/labels/settings/` |
+| `arnlabels/views.py`          | `/` overview, `/labels/` utility, `/labels/settings/` |
+| `arnlabels/static/arnlabels/app.css` | Shared stylesheet (light/dark) |
 | `arnlabels/models.py`         | `PrintSettings` (singleton), `VolumeAllocation` |
 
 ## Status

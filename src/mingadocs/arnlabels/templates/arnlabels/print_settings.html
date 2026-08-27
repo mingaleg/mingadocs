@@ -1,16 +1,21 @@
 {% extends "arnlabels/base.html" %}
-{% block title %}Print settings{% endblock %}
+{% block title %}Settings · mingadocs{% endblock %}
 {% block content %}
 <h1>Print settings</h1>
+<p class="lede">Global and permanent. Applies to every label sheet.</p>
 
 {% if not printers %}
-  <p><em>No CUPS printers detected (or CUPS unreachable). Only PDF download
-  will be available until a printer is configured.</em></p>
+  <ul class="messages"><li class="warning">
+    No CUPS printers detected (or CUPS is unreachable). Only PDF download will
+    be available until a printer is configured.
+  </li></ul>
 {% endif %}
 
-<form method="post">
-  {% csrf_token %}
-  {{ form.as_p }}
-  <button type="submit">Save</button>
-</form>
+<div class="card">
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Save</button>
+  </form>
+</div>
 {% endblock %}

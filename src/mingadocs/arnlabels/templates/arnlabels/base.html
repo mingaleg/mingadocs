@@ -1,17 +1,37 @@
-<!doctype html>
+{% load static %}<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>{% block title %}ARN Labels{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}mingadocs{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'arnlabels/app.css' %}">
 </head>
 <body>
-  <nav>
-    <a href="{% url 'arnlabels:label-utility' %}">Print labels</a> |
-    <a href="{% url 'arnlabels:print-settings' %}">Settings</a>
-  </nav>
-  {% if messages %}
-    <ul>{% for m in messages %}<li>{{ m }}</li>{% endfor %}</ul>
-  {% endif %}
-  {% block content %}{% endblock %}
+  <header class="site-header">
+    <div class="bar">
+      <a class="brand" href="{% url 'arnlabels:index' %}">
+        <span class="dot"></span> mingadocs
+      </a>
+      <nav>
+        <a href="{% url 'arnlabels:index' %}"
+           class="{% if nav == 'index' %}active{% endif %}">Overview</a>
+        <a href="{% url 'arnlabels:label-utility' %}"
+           class="{% if nav == 'labels' %}active{% endif %}">Print labels</a>
+        <a href="{% url 'arnlabels:print-settings' %}"
+           class="{% if nav == 'settings' %}active{% endif %}">Settings</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    {% if messages %}
+      <ul class="messages">
+        {% for m in messages %}
+          <li class="{{ m.tags }}">{{ m }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
 </body>
 </html>

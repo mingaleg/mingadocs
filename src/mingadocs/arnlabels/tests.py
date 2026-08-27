@@ -74,6 +74,26 @@ class PdfTests(TestCase):
             render_sheet(T, volume_page_arns("ARN", 2026, 1, 200))
 
 
+class ViewTests(TestCase):
+    def test_index_ok(self):
+        r = self.client.get("/")
+        self.assertEqual(r.status_code, 200)
+        self.assertTemplateUsed(r, "arnlabels/index.html")
+
+    def test_pages_ok(self):
+        self.assertEqual(self.client.get("/labels/").status_code, 200)
+        self.assertEqual(self.client.get("/labels/settings/").status_code, 200)
+
+    def test_download_pdf(self):
+        r = self.client.post(
+            "/labels/",
+            {"page_type": "continuation", "output": "pdf"},
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r["Content-Type"], "application/pdf")
+        self.assertTrue(r.content.startswith(b"%PDF"))
+
+
 class ServiceTests(TestCase):
     def test_suggest_defaults_first_volume(self):
         d = services.suggest_volume_defaults()

@@ -1,22 +1,33 @@
 {% extends "arnlabels/base.html" %}
-{% block title %}Print ARN labels{% endblock %}
+{% block title %}Print labels · mingadocs{% endblock %}
 {% block content %}
 <h1>Print ARN labels</h1>
-
-<p>
-  Prefix <strong>{{ config.arn_prefix }}</strong> &middot;
-  Sheet <strong>{{ template.name }}</strong>
-  ({{ template.labels_per_sheet }} labels) &middot;
-  Printer
-  <strong>{{ config.cups_printer|default:"(none - download only)" }}</strong>
-  &middot; <a href="{% url 'arnlabels:print-settings' %}">change</a>
+<p class="lede">
+  One sheet of {{ template.name }} ({{ template.labels_per_sheet }} labels).
 </p>
 
-<form method="post">
-  {% csrf_token %}
-  {{ form.non_field_errors }}
-  {{ form.as_p }}
-  <p><em>Volume-page fields are ignored for a continuation page.</em></p>
-  <button type="submit">Generate</button>
-</form>
+<div class="card">
+  <dl class="facts">
+    <dt>Prefix</dt><dd>{{ config.arn_prefix }}</dd>
+    <dt>Printer</dt>
+    <dd>
+      {{ config.cups_printer|default:"— none (download only)" }}
+      &middot; <a href="{% url 'arnlabels:print-settings' %}">change</a>
+    </dd>
+  </dl>
+</div>
+
+<div class="card">
+  <form method="post">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <ul class="errorlist">
+        {% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+    {{ form.as_p }}
+    <p class="helptext">Volume-page fields are ignored for a continuation page.</p>
+    <button type="submit">Generate</button>
+  </form>
+</div>
 {% endblock %}

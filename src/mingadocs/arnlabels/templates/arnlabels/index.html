@@ -1,0 +1,61 @@
+{% extends "arnlabels/base.html" %}
+{% block title %}Overview · mingadocs{% endblock %}
+{% block content %}
+<h1>Archive label printing</h1>
+<p class="lede">
+  Generate and print Code&nbsp;128 archive-serial-number stickers for incoming
+  and scanned documents.
+</p>
+
+<div class="grid-2">
+  <a class="tile" href="{% url 'arnlabels:label-utility' %}">
+    <div class="tile-title">Print labels &rarr;</div>
+    <div class="tile-sub">
+      Volume page for {{ suggestion.year }} / vol
+      {{ suggestion.volume|stringformat:"02d" }}, or a continuation sheet.
+    </div>
+  </a>
+  <a class="tile" href="{% url 'arnlabels:print-settings' %}">
+    <div class="tile-title">Settings &rarr;</div>
+    <div class="tile-sub">Prefix, printer and print behaviour.</div>
+  </a>
+</div>
+
+<div class="card">
+  <h2>Current configuration</h2>
+  <dl class="facts">
+    <dt>ARN prefix</dt><dd>{{ config.arn_prefix }}</dd>
+    <dt>Label stock</dt><dd>{{ template.name }} ({{ template.labels_per_sheet }} / sheet)</dd>
+    <dt>Printer</dt>
+    <dd>
+      {% if config.cups_printer %}
+        {{ config.cups_printer }}
+        <span class="pill">{% if config.print_directly_by_default %}prints directly{% else %}download by default{% endif %}</span>
+      {% else %}
+        <span class="pill off">not set — download only</span>
+      {% endif %}
+    </dd>
+  </dl>
+</div>
+
+<div class="card">
+  <h2>Recent volumes</h2>
+  {% if recent %}
+    <table class="data">
+      <thead><tr><th>Year</th><th>Volume</th><th>Max index</th><th>Created</th></tr></thead>
+      <tbody>
+        {% for a in recent %}
+          <tr>
+            <td>{{ a.year }}</td>
+            <td>{{ a.volume|stringformat:"02d" }}</td>
+            <td>{{ a.max_index|stringformat:"03d" }}</td>
+            <td>{{ a.created_at|date:"Y-m-d H:i" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">No volume pages generated yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

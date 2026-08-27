@@ -41,5 +41,9 @@ poetry run python src/mingadocs/manage.py migrate
 poetry run python src/mingadocs/manage.py runserver
 ```
 
-- Label utility:  `/labels/`
+- Overview:        `/`
+- Label utility:   `/labels/`
 - Print settings:  `/labels/settings/` (also in Django admin)
+
+Templates extend `arnlabels/base.html`; styling is one stylesheet at
+`arnlabels/static/arnlabels/app.css` (light/dark aware, no build step).

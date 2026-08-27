@@ -7,7 +7,7 @@ from django.shortcuts import redirect, render
 
 from . import printing, services
 from .forms import LabelBatchForm, PrintSettingsForm
-from .models import PrintSettings
+from .models import PrintSettings, VolumeAllocation
 from .services import PAGE_VOLUME
 
 
@@ -16,6 +16,22 @@ def _printer_names() -> list[str]:
         return sorted(printing.list_printers())
     except Exception:  # CUPS unreachable - degrade gracefully
         return []
+
+
+def index(request):
+    """Landing page: current configuration and recent volume activity."""
+    config = PrintSettings.get_solo()
+    return render(
+        request,
+        "arnlabels/index.html",
+        {
+            "nav": "index",
+            "config": config,
+            "template": services.current_template(),
+            "suggestion": services.suggest_volume_defaults(),
+            "recent": VolumeAllocation.objects.all()[:8],
+        },
+    )
 
 
 def label_utility(request):
@@ -77,6 +93,7 @@ def label_utility(request):
         request,
         "arnlabels/label_utility.html",
         {
+            "nav": "labels",
             "form": form,
             "config": config,
             "template": services.current_template(),
@@ -103,5 +120,5 @@ def print_settings(request):
     return render(
         request,
         "arnlabels/print_settings.html",
-        {"form": form, "printers": printers},
+        {"nav": "settings", "form": form, "printers": printers},
     )
