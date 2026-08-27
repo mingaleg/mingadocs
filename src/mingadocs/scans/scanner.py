@@ -42,21 +42,33 @@ def scan_page(cfg) -> bytes:
         except OSError as exc:
             raise ScannerError(f"fake scanner file unreadable: {exc}") from exc
 
-    cmd = [
-        "scanimage",
-        "--format=png",
-        f"--resolution={cfg.resolution_dpi}",
-        f"--mode={cfg.mode}",
-    ]
+    # Device-specific options (--resolution, --mode) are only recognised once
+    # the backend is loaded, so -d must come first. Not every backend supports
+    # them, so on an "unrecognized option" failure we retry without them.
+    base = ["scanimage", "--format=png"]
     if cfg.sane_device:
-        cmd += ["-d", cfg.sane_device]
-    try:
-        proc = subprocess.run(cmd, capture_output=True, timeout=300)
-    except FileNotFoundError as exc:
-        raise ScannerError("scanimage not installed (sane-utils)") from exc
-    except subprocess.TimeoutExpired as exc:
-        raise ScannerError("scanimage timed out") from exc
+        base += ["-d", cfg.sane_device]
+
+    opts = []
+    if cfg.resolution_dpi:
+        opts += [f"--resolution={cfg.resolution_dpi}"]
+    if cfg.mode:
+        opts += [f"--mode={cfg.mode}"]
+
+    proc = _run(base + opts)
+    if proc.returncode != 0 and opts and b"unrecognized option" in proc.stderr:
+        proc = _run(base)
+
     if proc.returncode != 0 or not proc.stdout:
         detail = proc.stderr.decode("utf-8", "replace").strip() or "no output"
         raise ScannerError(f"scanimage failed: {detail}")
     return proc.stdout
+
+
+def _run(cmd: list[str]) -> subprocess.CompletedProcess:
+    try:
+        return subprocess.run(cmd, capture_output=True, timeout=300)
+    except FileNotFoundError as exc:
+        raise ScannerError("scanimage not installed (sane-utils)") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise ScannerError("scanimage timed out") from exc

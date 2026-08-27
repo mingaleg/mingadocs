@@ -25,8 +25,9 @@ class ScanSettings(SingletonModel):
         default=300, validators=[MinValueValidator(50)]
     )
     mode = models.CharField(
-        max_length=32, default="Color",
-        help_text="scanimage --mode value, e.g. Color / Gray / Lineart.",
+        max_length=32, default="Color", blank=True,
+        help_text="scanimage --mode value, e.g. Color / Gray / Lineart. "
+                  "Leave blank to use the backend default.",
     )
     ocr_timeout_seconds = models.PositiveIntegerField(
         default=20, validators=[MinValueValidator(1)]

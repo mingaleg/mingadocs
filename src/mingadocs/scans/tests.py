@@ -80,6 +80,22 @@ class ScannerTests(TestCase):
             with self.assertRaises(ScannerError):
                 scan_page(mock.Mock(sane_device="", resolution_dpi=300, mode="Color"))
 
+    def test_retries_without_options_on_unrecognized_option(self):
+        calls = []
+
+        def fake_run(cmd, **kw):
+            calls.append(cmd)
+            if "--resolution=300" in cmd or "--mode=Color" in cmd:
+                return mock.Mock(returncode=1, stdout=b"",
+                                 stderr=b"scanimage: unrecognized option '--resolution=300'")
+            return mock.Mock(returncode=0, stdout=b"PNGDATA", stderr=b"")
+
+        with mock.patch("subprocess.run", side_effect=fake_run):
+            out = scan_page(mock.Mock(sane_device="d", resolution_dpi=300, mode="Color"))
+        self.assertEqual(out, b"PNGDATA")
+        self.assertEqual(len(calls), 2)
+        self.assertNotIn("--resolution=300", calls[1])
+
 
 def run_scan_sync(page):
     """Run scan + OCR inline for a page (no background pools)."""

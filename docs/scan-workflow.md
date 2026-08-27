@@ -98,8 +98,12 @@ pages and no alerts.
 ## Scanner backend
 
 `scans/scanner.py` shells out to SANE's `scanimage`
-(`--format=png --resolution … --mode …`, optional `-d <device>`).
+(`--format=png`, optional `-d <device>` first, then `--resolution` / `--mode`).
 
+- `-d <device>` is passed **before** the device-specific options because
+  `scanimage` only recognises `--resolution` / `--mode` once the backend is
+  loaded. If a backend rejects them (`unrecognized option`), the scan is
+  retried with just `--format=png`. `mode` may be left blank.
 - `scanimage` comes from the system package `sane-utils`.
 - `list_devices()` parses `scanimage -L` for the settings page (best-effort).
 - **Dev / tests without hardware:** set `MINGADOCS_FAKE_SCANNER` to an image
@@ -113,7 +117,7 @@ pages and no alerts.
 |-----------------------|---------|---------|
 | `sane_device`         | (blank) | `scanimage -d` value; blank = SANE default |
 | `resolution_dpi`      | 300     | `scanimage --resolution` |
-| `mode`                | `Color` | `scanimage --mode` |
+| `mode`                | `Color` | `scanimage --mode` (blank = backend default) |
 | `ocr_timeout_seconds` | 20      | Per-page barcode-decode deadline |
 
 The ARN **prefix** is shared with label printing (`arnlabels.PrintSettings`).
