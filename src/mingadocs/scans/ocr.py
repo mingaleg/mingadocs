@@ -23,12 +23,7 @@ def detect_arn(image_bytes: bytes, prefix: str) -> OcrResult:
     """
     img = Image.open(io.BytesIO(image_bytes))
     img.load()
-    results = zxingcpp.read_barcodes(img)
-    matches = [
-        r.text for r in results
-        if r.format == zxingcpp.BarcodeFormat.Code128
-        and r.text.startswith(prefix)
-    ]
+    matches = sorted(_scan_code128(img, prefix))
     if len(matches) == 1:
         return OcrResult(arn=matches[0], note="", candidate_count=1)
     if not matches:
@@ -38,3 +33,30 @@ def detect_arn(image_bytes: bytes, prefix: str) -> OcrResult:
         note=f"{len(matches)} ARN barcodes found",
         candidate_count=len(matches),
     )
+
+
+# zxing-cpp's default binarizer (LocalAverage) can miss a crisp Code 128 on a
+# full-resolution flatbed scan that a fixed threshold reads fine, so we try
+# several binarizers and union the Code 128 hits.
+_BINARIZERS = (
+    zxingcpp.Binarizer.LocalAverage,
+    zxingcpp.Binarizer.FixedThreshold,
+    zxingcpp.Binarizer.GlobalHistogram,
+)
+
+
+def _scan_code128(img: Image.Image, prefix: str) -> set[str]:
+    found: set[str] = set()
+    for binarizer in _BINARIZERS:
+        try:
+            results = zxingcpp.read_barcodes(
+                img,
+                formats=zxingcpp.BarcodeFormat.Code128,
+                binarizer=binarizer,
+            )
+        except Exception:  # noqa: BLE001 - a bad pass must not sink detection
+            continue
+        for r in results:
+            if r.text.startswith(prefix):
+                found.add(r.text)
+    return found

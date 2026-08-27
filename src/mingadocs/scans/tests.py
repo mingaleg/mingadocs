@@ -63,6 +63,20 @@ class OcrPipelineTests(TestCase):
         r = ocr.detect_arn(make_page_png("XYZ202600042"), "ARN")
         self.assertIsNone(r.arn)
 
+    def test_falls_back_to_other_binarizers(self):
+        """A Code 128 only the fixed-threshold binarizer sees is still found."""
+        import zxingcpp
+        real = zxingcpp.read_barcodes
+
+        def picky(img, *a, binarizer=None, **kw):
+            if binarizer == zxingcpp.Binarizer.LocalAverage:
+                return []
+            return real(img, *a, binarizer=binarizer, **kw)
+
+        with mock.patch.object(zxingcpp, "read_barcodes", side_effect=picky):
+            r = ocr.detect_arn(make_page_png("ARN202600042"), "ARN")
+        self.assertEqual(r.arn, "ARN202600042")
+
 
 @override_settings(MEDIA_ROOT=_TMP)
 class ScannerTests(TestCase):

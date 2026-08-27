@@ -57,6 +57,11 @@ Only Code 128 symbols whose text starts with the configured `PrintSettings`
 prefix are considered. **Exactly one** match → that ARN. Zero or more than one
 → the page has no ARN assigned and must be resolved by hand.
 
+`ocr.detect_arn` runs `zxingcpp.read_barcodes` once per binarizer
+(`LocalAverage`, `FixedThreshold`, `GlobalHistogram`) and unions the hits: the
+default `LocalAverage` binarizer sometimes misses a crisp barcode on a
+full-resolution flatbed scan that a fixed threshold reads cleanly.
+
 ### Restart recovery
 
 `ScansConfig.ready()` connects a one-shot `request_started` handler that calls
