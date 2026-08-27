@@ -26,6 +26,11 @@ scanning ──stop──▶ review ──finalize──▶ finalized
   remove pages, resolve alerts, then "Finalize".
 - **finalized** — PDFs created; raw scan images and `ScanPage` rows deleted.
 
+Any non-finalized batch can be **discarded** from the console, the review page
+or the batch list (`POST /scans/<id>/discard/`, `services.discard_batch`): the
+`ScanBatch`, every `ScanPage` and all image/thumbnail files are hard-deleted.
+There is no undo. A finalized batch cannot be discarded (its `Document`s stay).
+
 ## Async scan / OCR model
 
 In-process background threads (`scans/jobs.py`), no broker. Job state lives on

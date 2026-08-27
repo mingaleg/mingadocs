@@ -12,6 +12,7 @@
 <div class="actions">
   <button type="button" id="scan-btn">Scan Page</button>
   <button type="button" id="stop-btn" class="btn secondary">Stop</button>
+  <button type="button" id="discard-btn" class="btn danger">Discard</button>
 </div>
 <p class="helptext" id="scan-msg"></p>
 
@@ -29,11 +30,24 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="discard-modal" hidden>
+  <div class="modal">
+    <h2>Discard this batch?</h2>
+    <p>The batch and all <strong>{{ batch.pages.count }}</strong> scanned page(s)
+       are permanently deleted. This cannot be undone.</p>
+    <div class="actions">
+      <button type="button" id="discard-confirm" class="btn danger">Discard batch</button>
+      <button type="button" id="discard-cancel" class="btn secondary">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   var statusUrl = "{% url 'scans:status' batch.id %}";
   var scanUrl = "{% url 'scans:scan' batch.id %}";
   var stopUrl = "{% url 'scans:stop' batch.id %}";
+  var discardUrl = "{% url 'scans:discard' batch.id %}";
   var btn = document.getElementById('scan-btn');
   var stopBtn = document.getElementById('stop-btn');
   var msg = document.getElementById('scan-msg');
@@ -90,6 +104,18 @@
   });
   document.getElementById('stop-confirm').addEventListener('click', function () {
     window.postJSON(stopUrl).then(function (r) { return r.json(); })
+      .then(function (d) { location.href = d.redirect; });
+  });
+
+  var discardModal = document.getElementById('discard-modal');
+  document.getElementById('discard-btn').addEventListener('click', function () {
+    discardModal.hidden = false;
+  });
+  document.getElementById('discard-cancel').addEventListener('click', function () {
+    discardModal.hidden = true;
+  });
+  document.getElementById('discard-confirm').addEventListener('click', function () {
+    window.postJSON(discardUrl).then(function (r) { return r.json(); })
       .then(function (d) { location.href = d.redirect; });
   });
 })();

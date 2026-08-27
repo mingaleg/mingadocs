@@ -13,6 +13,7 @@ urlpatterns = [
     path("<int:batch_id>/status/", views.batch_status, name="status"),
     path("<int:batch_id>/scan/", views.scan_page, name="scan"),
     path("<int:batch_id>/stop/", views.stop_batch, name="stop"),
+    path("<int:batch_id>/discard/", views.discard_batch, name="discard"),
     path("<int:batch_id>/reorder/", views.reorder, name="reorder"),
     path("<int:batch_id>/finalize/", views.finalize, name="finalize"),
     path("<int:batch_id>/pages/<int:page_id>/", views.page_detail, name="page"),

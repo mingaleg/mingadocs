@@ -151,6 +151,37 @@ class BatchFlowTests(TestCase):
             with self.assertRaises(ValueError):
                 services.add_scan_page(batch)
 
+    def test_discard_batch_hard_deletes_pages_and_files(self):
+        batch = services.start_batch()
+        with self._fake(make_page_png("ARN202600042")), \
+                mock.patch.object(jobs, "enqueue_scan"):
+            page = services.add_scan_page(batch)
+            run_scan_sync(page)
+        img_path = page.image.path
+        thumb_path = page.thumbnail.path
+        self.assertTrue(os.path.exists(img_path))
+
+        services.discard_batch(batch)
+
+        self.assertFalse(ScanBatch.objects.filter(pk=batch.pk).exists())
+        self.assertFalse(ScanPage.objects.filter(pk=page.pk).exists())
+        self.assertFalse(os.path.exists(img_path))
+        self.assertFalse(os.path.exists(thumb_path))
+
+    def test_discard_batch_rejects_finalized(self):
+        batch = services.start_batch()
+        batch.status = ScanBatch.FINALIZED
+        batch.save(update_fields=["status"])
+        with self.assertRaises(ValueError):
+            services.discard_batch(batch)
+
+    def test_discard_view_redirects_to_list(self):
+        batch = services.start_batch()
+        resp = self.client.post(f"/scans/{batch.id}/discard/")
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp["Location"], "/scans/")
+        self.assertFalse(ScanBatch.objects.filter(pk=batch.pk).exists())
+
 
 @override_settings(MEDIA_ROOT=_TMP)
 class AlertTests(TestCase):

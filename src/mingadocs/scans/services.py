@@ -51,6 +51,17 @@ def stop_batch(batch: ScanBatch) -> None:
     batch.save(update_fields=["status", "stopped_at"])
 
 
+@transaction.atomic
+def discard_batch(batch: ScanBatch) -> None:
+    """Hard-delete a non-finalized batch and every scanned page + image file."""
+    if batch.status == ScanBatch.FINALIZED:
+        raise ValueError("a finalized batch cannot be discarded")
+    for page in batch.pages.all():
+        page.image.delete(save=False)
+        page.thumbnail.delete(save=False)
+    batch.delete()
+
+
 def set_page_arn(page: ScanPage, *, arn: str = "", continuation: bool = False,
                  clear: bool = False) -> None:
     if clear:

@@ -111,6 +111,20 @@ def stop_batch(request, batch_id):
 
 
 @require_POST
+def discard_batch(request, batch_id):
+    batch = get_object_or_404(ScanBatch, pk=batch_id)
+    try:
+        services.discard_batch(batch)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=409)
+    messages.success(request, f"Discarded batch #{batch_id}.")
+    url = reverse("scans:batch-list")
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse({"redirect": url})
+    return redirect(url)
+
+
+@require_POST
 def reorder(request, batch_id):
     batch = get_object_or_404(ScanBatch, pk=batch_id)
     try:

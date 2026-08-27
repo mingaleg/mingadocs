@@ -16,7 +16,7 @@
   <h2>In-flight batches</h2>
   {% if active %}
     <table class="data">
-      <thead><tr><th>Batch</th><th>Status</th><th>Started</th><th>Pages</th></tr></thead>
+      <thead><tr><th>Batch</th><th>Status</th><th>Started</th><th>Pages</th><th></th></tr></thead>
       <tbody>
       {% for b in active %}
         <tr>
@@ -24,6 +24,13 @@
           <td><span class="pill {% if b.status == 'review' %}off{% endif %}">{{ b.get_status_display }}</span></td>
           <td>{{ b.created_at|date:"Y-m-d H:i" }}</td>
           <td>{{ b.pages.count }}</td>
+          <td>
+            <form method="post" action="{% url 'scans:discard' b.id %}"
+                  onsubmit="return confirm('Discard batch #{{ b.id }} and its {{ b.pages.count }} page(s)? This cannot be undone.');">
+              {% csrf_token %}
+              <button type="submit" class="btn danger small">Discard</button>
+            </form>
+          </td>
         </tr>
       {% endfor %}
       </tbody>

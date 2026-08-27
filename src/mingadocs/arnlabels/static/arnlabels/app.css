@@ -262,6 +262,17 @@ button:hover, .btn:hover { filter: brightness(1.06); }
   background: transparent;
   color: var(--accent);
 }
+button.danger, .btn.danger {
+  background: transparent;
+  border-color: var(--err-ink, #b3261e);
+  color: var(--err-ink, #b3261e);
+}
+button.danger:hover, .btn.danger:hover {
+  background: var(--err-ink, #b3261e);
+  color: #fff;
+  filter: none;
+}
+button.small, .btn.small { padding: 5px 12px; font-size: .85em; }
 button:disabled, .btn:disabled {
   opacity: .45;
   cursor: not-allowed;
