@@ -124,7 +124,10 @@ pages and no alerts.
 
 ## Settings
 
-`ScanSettings` singleton (`/scans/settings/`, also Django admin):
+`ScanSettings` singleton — edited in the **Scanner** section of the unified
+settings page (`/scans/settings/#scanner`, linked as "Settings" in the nav;
+`/labels/settings/` redirects to the **Label printing** section). Also in the
+Django admin.
 
 | Field                 | Default | Purpose |
 |-----------------------|---------|---------|

@@ -1,0 +1,42 @@
+{% extends "arnlabels/base.html" %}
+{% block title %}Settings · mingadocs{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+<p class="lede">Global and permanent.
+  <a href="#labels">Label printing</a> · <a href="#scanner">Scanner</a>
+</p>
+
+<section id="labels" class="card">
+  <h2>Label printing</h2>
+  {% if not printers %}
+    <ul class="messages"><li class="warning">
+      No CUPS printers detected (or CUPS is unreachable). Only PDF download will
+      be available until a printer is configured.
+    </li></ul>
+  {% endif %}
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="section" value="labels">
+    {{ print_form.as_p }}
+    <div class="actions"><button type="submit">Save label settings</button></div>
+  </form>
+</section>
+
+<section id="scanner" class="card">
+  <h2>Scanner</h2>
+  {% if not devices %}
+    <ul class="messages"><li class="warning">
+      No SANE devices detected (<code>scanimage -L</code> returned nothing —
+      network scanners can take a while to probe). You can still type a device
+      name (e.g. <code>escl:https://HOST:443</code>), or set
+      <code>MINGADOCS_FAKE_SCANNER</code> for testing without hardware.
+    </li></ul>
+  {% endif %}
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="section" value="scanner">
+    {{ scan_form.as_p }}
+    <div class="actions"><button type="submit">Save scanner settings</button></div>
+  </form>
+</section>
+{% endblock %}

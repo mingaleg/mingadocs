@@ -6,7 +6,7 @@
   One sheet of {{ template.name }} ({{ template.labels_per_sheet }} labels) ·
   prefix <strong>{{ config.arn_prefix }}</strong> ·
   printer {{ config.cups_printer|default:"— none" }} ·
-  <a href="{% url 'arnlabels:print-settings' %}">change</a>
+  <a href="{% url 'scans:settings' %}#labels">change</a>
 </p>
 
 <div class="card">
@@ -67,7 +67,7 @@
     {% if not can_print %}
       <p class="helptext">
         No printer configured —
-        <a href="{% url 'arnlabels:print-settings' %}">set one</a> to enable printing.
+        <a href="{% url 'scans:settings' %}#labels">set one</a> to enable printing.
       </p>
     {% endif %}
   </form>

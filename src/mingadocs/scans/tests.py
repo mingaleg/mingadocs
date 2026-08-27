@@ -274,11 +274,35 @@ class FinalizeTests(TestCase):
 
 @override_settings(MEDIA_ROOT=_TMP)
 class ViewTests(TestCase):
+    def setUp(self):
+        p = mock.patch.object(scanner_mod, "list_devices", return_value=[])
+        p.start()
+        self.addCleanup(p.stop)
+
     def test_pages_render(self):
         b = services.start_batch()
         self.assertEqual(self.client.get("/scans/").status_code, 200)
         self.assertEqual(self.client.get(f"/scans/{b.id}/").status_code, 200)
-        self.assertEqual(self.client.get("/scans/settings/").status_code, 200)
+        r = self.client.get("/scans/settings/")
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'id="labels"')
+        self.assertContains(r, 'id="scanner"')
+
+    def test_old_label_settings_url_redirects(self):
+        r = self.client.get("/labels/settings/")
+        self.assertRedirects(r, "/scans/settings/#labels",
+                             fetch_redirect_response=False)
+
+    def test_settings_saves_each_section(self):
+        r = self.client.post("/scans/settings/", {
+            "section": "scanner", "resolution_dpi": 600, "mode": "Gray",
+            "ocr_timeout_seconds": 15, "sane_device": "escl:https://h:443",
+        })
+        self.assertEqual(r.status_code, 302)
+        from .models import ScanSettings
+        cfg = ScanSettings.get_solo()
+        self.assertEqual(cfg.resolution_dpi, 600)
+        self.assertEqual(cfg.sane_device, "escl:https://h:443")
 
     def test_review_redirects_while_scanning(self):
         b = services.start_batch()

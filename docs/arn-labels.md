@@ -138,7 +138,9 @@ larger label stock.
 ## Settings
 
 Global and permanent, stored as a single `PrintSettings` row (django-solo).
-Editable on `/labels/settings/` and in the Django admin.
+Editable in the **Label printing** section of the unified settings page
+(`/scans/settings/#labels`; `/labels/settings/` redirects there) and in the
+Django admin.
 
 | Field                       | Default | Purpose |
 |-----------------------------|---------|---------|
@@ -170,7 +172,7 @@ Editable on `/labels/settings/` and in the Django admin.
 | `arnlabels/printing.py`       | CUPS integration (list queues, submit job) |
 | `arnlabels/services.py`       | Auto-population, sheet building, allocation recording |
 | `arnlabels/forms.py`          | Settings form + label batch form |
-| `arnlabels/views.py`          | `/` overview, `/labels/` utility, `/labels/settings/` |
+| `arnlabels/views.py`          | `/` overview, `/labels/` utility (`/labels/settings/` → unified settings page in `scans`) |
 | `arnlabels/static/arnlabels/app.css` | Shared stylesheet (light/dark) |
 | `arnlabels/models.py`         | `PrintSettings` (singleton), `VolumeAllocation` |
 

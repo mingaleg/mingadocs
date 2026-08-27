@@ -4,18 +4,12 @@ from __future__ import annotations
 from django.contrib import messages
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 
 from . import printing, services
-from .forms import LabelBatchForm, PrintSettingsForm
+from .forms import LabelBatchForm
 from .models import PrintSettings, VolumeAllocation
 from .services import PAGE_VOLUME
-
-
-def _printer_names() -> list[str]:
-    try:
-        return sorted(printing.list_printers())
-    except Exception:  # CUPS unreachable - degrade gracefully
-        return []
 
 
 def index(request):
@@ -117,23 +111,5 @@ def label_utility(request):
 
 
 def print_settings(request):
-    """Edit the global PrintSettings singleton."""
-    config = PrintSettings.get_solo()
-    printers = _printer_names()
-
-    if request.method == "POST":
-        form = PrintSettingsForm(
-            request.POST, instance=config, printers=printers
-        )
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Settings saved.")
-            return redirect("arnlabels:print-settings")
-    else:
-        form = PrintSettingsForm(instance=config, printers=printers)
-
-    return render(
-        request,
-        "arnlabels/print_settings.html",
-        {"nav": "settings", "form": form, "printers": printers},
-    )
+    """Old URL — label settings now live on the unified settings page."""
+    return redirect(reverse("scans:settings") + "#labels")

@@ -51,9 +51,9 @@ poetry run python src/mingadocs/manage.py runserver
 
 - Overview:        `/`
 - Label utility:   `/labels/`
-- Print settings:  `/labels/settings/` (also in Django admin)
 - Scan intake:     `/scans/`
-- Scan settings:   `/scans/settings/`
+- Settings:         `/scans/settings/` — unified page, `#labels` + `#scanner`
+  sections (also in Django admin). `/labels/settings/` redirects here.
 
 Without a scanner, set `MINGADOCS_FAKE_SCANNER=/path/to/image.png` and every
 "Scan Page" returns that image.

@@ -16,11 +16,15 @@ class ScannerError(RuntimeError):
 
 
 def list_devices() -> list[str]:
-    """Best-effort list of SANE device names (``scanimage -L``)."""
+    """Best-effort list of SANE device names (``scanimage -L``).
+
+    Network backends (escl / hpaio) make this slow, so give it a generous
+    timeout and parse whatever came back regardless of exit status.
+    """
     try:
         out = subprocess.run(
             ["scanimage", "-L"],
-            capture_output=True, text=True, timeout=30, check=True,
+            capture_output=True, text=True, timeout=90,
         ).stdout
     except Exception:  # noqa: BLE001 - degrade gracefully for the settings UI
         return []
@@ -28,7 +32,9 @@ def list_devices() -> list[str]:
     for line in out.splitlines():
         line = line.strip()
         if line.startswith("device `") and "'" in line[8:]:
-            devices.append(line[8:].split("'", 1)[0])
+            name = line[8:].split("'", 1)[0]
+            if name and name not in devices:
+                devices.append(name)
     return devices
 
 
