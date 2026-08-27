@@ -3,31 +3,94 @@
 {% block content %}
 <h1>Print ARN labels</h1>
 <p class="lede">
-  One sheet of {{ template.name }} ({{ template.labels_per_sheet }} labels).
+  One sheet of {{ template.name }} ({{ template.labels_per_sheet }} labels) ·
+  prefix <strong>{{ config.arn_prefix }}</strong> ·
+  printer {{ config.cups_printer|default:"— none" }} ·
+  <a href="{% url 'arnlabels:print-settings' %}">change</a>
 </p>
 
 <div class="card">
-  <dl class="facts">
-    <dt>Prefix</dt><dd>{{ config.arn_prefix }}</dd>
-    <dt>Printer</dt>
-    <dd>
-      {{ config.cups_printer|default:"— none (download only)" }}
-      &middot; <a href="{% url 'arnlabels:print-settings' %}">change</a>
-    </dd>
-  </dl>
-</div>
-
-<div class="card">
-  <form method="post">
+  <form method="post" id="label-form">
     {% csrf_token %}
+    {{ form.page_type }}
+
     {% if form.non_field_errors %}
       <ul class="errorlist">
         {% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}
       </ul>
     {% endif %}
-    {{ form.as_p }}
-    <p class="helptext">Volume-page fields are ignored for a continuation page.</p>
-    <button type="submit">Generate</button>
+
+    <div class="tabs" role="tablist">
+      <button type="button" class="tab" data-page="volume">Volume page</button>
+      <button type="button" class="tab" data-page="continuation">Continuation</button>
+    </div>
+
+    <div class="tab-panel" data-panel="volume">
+      <p class="helptext">
+        Start of new documents — one label per document, index 0 to max.
+      </p>
+      <div class="field-row">
+        <div class="field">
+          {{ form.year.label_tag }}{{ form.year }}
+          {{ form.year.errors }}
+        </div>
+        <div class="field">
+          {{ form.volume.label_tag }}{{ form.volume }}
+          {{ form.volume.errors }}
+        </div>
+        <div class="field">
+          {{ form.max_index.label_tag }}{{ form.max_index }}
+          {{ form.max_index.errors }}
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-panel" data-panel="continuation" hidden>
+      <p class="helptext">
+        Every label is the continuation ARN
+        (<code>{{ config.arn_prefix }} 000000000</code>) — fills the whole sheet.
+      </p>
+    </div>
+
+    <div class="actions">
+      {% if default_output == "print" %}
+        <button type="submit" name="output" value="print" class="btn"
+                {% if not can_print %}disabled{% endif %}>Send to printer</button>
+        <button type="submit" name="output" value="pdf" class="btn secondary">Download PDF</button>
+      {% else %}
+        <button type="submit" name="output" value="pdf" class="btn">Download PDF</button>
+        <button type="submit" name="output" value="print" class="btn secondary"
+                {% if not can_print %}disabled{% endif %}>Send to printer</button>
+      {% endif %}
+    </div>
+    {% if not can_print %}
+      <p class="helptext">
+        No printer configured —
+        <a href="{% url 'arnlabels:print-settings' %}">set one</a> to enable printing.
+      </p>
+    {% endif %}
   </form>
 </div>
+
+<script>
+(function () {
+  var form = document.getElementById('label-form');
+  var hidden = form.querySelector('[name=page_type]');
+  var tabs = form.querySelectorAll('.tab');
+  var panels = form.querySelectorAll('.tab-panel');
+  function select(page) {
+    hidden.value = page;
+    tabs.forEach(function (t) {
+      t.classList.toggle('active', t.dataset.page === page);
+    });
+    panels.forEach(function (p) {
+      p.hidden = p.dataset.panel !== page;
+    });
+  }
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () { select(t.dataset.page); });
+  });
+  select(hidden.value || 'volume');
+})();
+</script>
 {% endblock %}

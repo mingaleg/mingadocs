@@ -158,6 +158,51 @@ form ul label { font-weight: 400; margin-left: 6px; }
 .helptext { display: block; color: var(--muted); font-size: .85rem; margin-top: 2px; }
 .errorlist { color: var(--err-ink); list-style: none; padding: 0; margin: 4px 0; font-size: .9rem; }
 
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 18px;
+}
+.tab {
+  appearance: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+.tab:hover { color: var(--text); }
+.tab.active {
+  color: var(--accent);
+  border-color: var(--border);
+  background: var(--surface);
+  border-bottom: 1px solid var(--surface);
+}
+
+.tab-panel { margin-bottom: 8px; }
+.tab-panel[hidden] { display: none; }
+
+.field-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.field { flex: 1 1 120px; }
+.field input { max-width: none; width: 100%; }
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 22px;
+}
+
 button, .btn {
   appearance: none;
   border: 1px solid var(--accent);
@@ -175,6 +220,11 @@ button:hover, .btn:hover { filter: brightness(1.06); }
 .btn.secondary {
   background: transparent;
   color: var(--accent);
+}
+button:disabled, .btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+  filter: none;
 }
 
 table.data { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }

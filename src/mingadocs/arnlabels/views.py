@@ -84,7 +84,6 @@ def label_utility(request):
         form = LabelBatchForm(
             initial={
                 "page_type": PAGE_VOLUME,
-                "output": "print" if config.print_directly_by_default else "pdf",
                 **services.suggest_volume_defaults(),
             }
         )
@@ -97,6 +96,12 @@ def label_utility(request):
             "form": form,
             "config": config,
             "template": services.current_template(),
+            "can_print": bool(config.cups_printer),
+            "default_output": (
+                "print"
+                if config.print_directly_by_default and config.cups_printer
+                else "pdf"
+            ),
         },
     )
 

@@ -32,7 +32,10 @@ Example human-readable values: `ARN 202600042`, `ARN 000000000`.
 
 ## Page types
 
-The user chooses which kind of sheet to print.
+The user picks the kind of sheet with a **tab** (Volume / Continuation); the
+two submit buttons are **Send to printer** and **Download PDF**. Whichever
+matches `print_directly_by_default` (and a configured printer) is shown first
+and accent-styled; "Send to printer" is disabled when no printer is set.
 
 ### Volume page
 

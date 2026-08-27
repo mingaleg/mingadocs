@@ -33,14 +33,16 @@ class LabelBatchForm(forms.Form):
         ("pdf", "Download PDF"),
     ]
 
+    # Driven by the tab strip in the template.
     page_type = forms.ChoiceField(
-        choices=PAGE_CHOICES, widget=forms.RadioSelect, initial=PAGE_VOLUME
+        choices=PAGE_CHOICES, widget=forms.HiddenInput, initial=PAGE_VOLUME
     )
     year = forms.IntegerField(min_value=1000, max_value=9999, required=False)
     volume = forms.IntegerField(min_value=0, max_value=99, required=False)
     max_index = forms.IntegerField(min_value=0, max_value=999, required=False)
+    # Set by which submit button was pressed (name="output").
     output = forms.ChoiceField(
-        choices=OUTPUT_CHOICES, widget=forms.RadioSelect, required=False
+        choices=OUTPUT_CHOICES, widget=forms.HiddenInput, required=False
     )
 
     def clean(self):
