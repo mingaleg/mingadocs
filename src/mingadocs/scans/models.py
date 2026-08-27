@@ -156,3 +156,12 @@ class Document(models.Model):
 
     def __str__(self) -> str:  # pragma: no cover - trivial
         return self.start_arn
+
+    @property
+    def human_start_arn(self) -> str:
+        """`start_arn` grouped prefix / year / volume / index for display."""
+        prefix = PrintSettings.get_solo().arn_prefix
+        try:
+            return Arn.parse(self.start_arn, prefix).human_readable()
+        except ValueError:
+            return self.start_arn

@@ -5,8 +5,9 @@ An ARN is ``<prefix> <body>`` where ``<body>`` is 9 digits:
 * Volume start:  ``YYYYVVNNN`` -> year (4), volume (2), index (3)
 * Continuation:  ``000000000`` (9 zeros)
 
-The barcode encodes the ARN *without* the separating space; the space is only
-a visual aid in the human-readable line printed under the barcode.
+The barcode encodes the ARN *without* separators; the spaces are only a visual
+aid in the human-readable line, which is grouped ``<prefix> <year> <volume>
+<index>`` for a volume start (``<prefix> <body>`` for a continuation).
 
 See ``docs/arn-labels.md``.
 """
@@ -64,8 +65,16 @@ class Arn:
         return f"{self.prefix}{self.body}"
 
     def human_readable(self) -> str:
-        """Text printed under the barcode (space after prefix)."""
-        return f"{self.prefix} {self.body}"
+        """Text shown to people (under stickers, in the web UI).
+
+        Volume start is grouped ``<prefix> <year> <volume> <index>``; a
+        continuation stays ``<prefix> <body>`` (it has no such structure).
+        The barcode value is unaffected — see ``barcode_value``.
+        """
+        if self.is_continuation:
+            return f"{self.prefix} {self.body}"
+        year, volume, index = self.body[:4], self.body[4:6], self.body[6:]
+        return f"{self.prefix} {year} {volume} {index}"
 
 
 def volume_page_arns(

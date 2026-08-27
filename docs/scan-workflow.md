@@ -76,7 +76,7 @@ by a crash are marked failed. A half-scanned page is **never** auto re-scanned
 ## Display labels
 
 In the console and review grids a volume-start page shows its ARN
-(`PREFIX 202600042`); a continuation page shows `page N`, its 1-based position
+(`PREFIX 2026 00 042`); a continuation page shows `page N`, its 1-based position
 within the document it continues (`views._arn_labels`, carried in the status
 JSON as `arn_label`). Pages with no effective ARN fall back to the OCR note.
 

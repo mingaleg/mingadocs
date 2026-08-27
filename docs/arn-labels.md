@@ -15,8 +15,9 @@ human-readable value printed underneath it.
 
 - **prefix** — configurable, global, permanent (see [Settings](#settings)).
   Default `ARN`.
-- A single **space** separates the prefix from the body in the human-readable
-  line. The **barcode encodes prefix + body with no space.**
+- The human-readable line is **space-separated into groups**: a volume start
+  renders `<prefix> <year> <volume> <index>`, a continuation `<prefix> <body>`.
+  The **barcode encodes prefix + body with no separators** (`Arn.barcode_value`).
 - **body** — always 9 digits, one of:
 
   | Kind          | Body format              | Meaning                              |
@@ -28,7 +29,7 @@ human-readable value printed underneath it.
   - `VV`   — volume, 2 digits (`00`–`99`)
   - `NNN`  — document index within the volume, 3 digits (`000`–`999`)
 
-Example human-readable values: `ARN 202600042`, `ARN 000000000`.
+Example human-readable values: `ARN 2026 00 042`, `ARN 000000000`.
 
 ## Page types
 

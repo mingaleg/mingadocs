@@ -70,8 +70,14 @@ def _draw_label(
     )
     drawing.drawOn(c, sx + (sw - barcode_w) / 2, sy + text_h + gap)
 
-    c.setFont(FONT_NAME, FONT_SIZE_PT)
-    c.drawCentredString(sx + sw / 2, sy, arn.human_readable())
+    # Grouped ARN (prefix / year / volume / index). Shrink the font if the
+    # extra separators would overrun the safe width on a long prefix.
+    text = arn.human_readable()
+    size = FONT_SIZE_PT
+    while size > 3.5 and c.stringWidth(text, FONT_NAME, size) > sw:
+        size -= 0.25
+    c.setFont(FONT_NAME, size)
+    c.drawCentredString(sx + sw / 2, sy, text)
 
 
 __all__ = ["render_sheet"]

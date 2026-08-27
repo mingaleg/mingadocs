@@ -12,7 +12,7 @@ class ArnTests(TestCase):
         a = Arn.volume_start("ARN", 2026, 4, 42)
         self.assertEqual(a.body, "202604042")
         self.assertEqual(a.barcode_value(), "ARN202604042")
-        self.assertEqual(a.human_readable(), "ARN 202604042")
+        self.assertEqual(a.human_readable(), "ARN 2026 04 042")
         self.assertFalse(a.is_continuation)
 
     def test_continuation(self):
@@ -103,11 +103,12 @@ class ViewTests(TestCase):
     def test_index_shows_scan_and_document_islands(self):
         from scans.models import Document
 
-        Document.objects.create(start_arn="11037202600042", page_count=3)
+        Document.objects.create(start_arn="ARN202600042", page_count=3)
         r = self.client.get("/")
         self.assertContains(r, "Scan intake")
         self.assertContains(r, "Recent documents")
-        self.assertContains(r, "11037202600042")
+        # ARN groups are separated in every rendering.
+        self.assertContains(r, "ARN 2026 00 042")
         # The redundant tile shortcuts (all present in the top nav) are gone.
         self.assertNotContains(r, 'class="tile"')
 

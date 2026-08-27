@@ -13,7 +13,6 @@ from django.views.decorators.http import require_POST
 
 from . import scanner, services
 from .forms import PageArnForm, ScanSettingsForm
-from arnlabels.arn import Arn
 from arnlabels.models import PrintSettings
 
 from .models import Document, ScanBatch, ScanPage, ScanSettings
@@ -84,16 +83,8 @@ def batch_list(request):
 
 
 def document_list(request):
-    prefix = PrintSettings.get_solo().arn_prefix
-    documents = []
-    for doc in Document.objects.all():
-        try:
-            label = Arn.parse(doc.start_arn, prefix).human_readable()
-        except ValueError:
-            label = doc.start_arn
-        documents.append((doc, label))
     return render(request, "scans/document_list.html", {
-        "nav": "documents", "documents": documents,
+        "nav": "documents", "documents": Document.objects.all(),
     })
 
 

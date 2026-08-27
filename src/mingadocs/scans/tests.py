@@ -308,7 +308,7 @@ class ViewTests(TestCase):
         Document.objects.create(start_arn="ARN202600042", page_count=3, batch=b)
         r = self.client.get("/scans/documents/")
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, "ARN 202600042")
+        self.assertContains(r, "ARN 2026 00 042")
 
     def test_old_label_settings_url_redirects(self):
         r = self.client.get("/labels/settings/")
@@ -360,7 +360,7 @@ class ViewTests(TestCase):
                                     manual_continuation=True)
         pages = self.client.get(f"/scans/{b.id}/status/").json()["pages"]
         self.assertEqual([p["arn_label"] for p in pages],
-                         ["ARN 202600001", "page 2", "page 3"])
+                         ["ARN 2026 00 001", "page 2", "page 3"])
 
     def test_page_arn_override_takes_split_year_volume_index(self):
         b = services.start_batch()
