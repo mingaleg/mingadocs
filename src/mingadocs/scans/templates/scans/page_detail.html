@@ -35,11 +35,11 @@
                  size="{{ config_prefix|length }}"
                  readonly tabindex="-1" aria-label="ARN prefix (fixed)">
           <input type="text" id="arn-year" inputmode="numeric" maxlength="4"
-                 value="{{ manual_year }}" aria-label="year">
+                 size="4" value="{{ manual_year }}" aria-label="year">
           <input type="text" id="arn-volume" inputmode="numeric" maxlength="2"
-                 value="{{ manual_volume }}" placeholder="vol" aria-label="volume">
+                 size="3" value="{{ manual_volume }}" placeholder="vol" aria-label="vol">
           <input type="text" id="arn-index" inputmode="numeric" maxlength="3"
-                 value="{{ manual_index }}" placeholder="idx" aria-label="index">
+                 size="3" value="{{ manual_index }}" placeholder="idx" aria-label="idx">
         </span>
       </p>
       <div class="actions">

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime
 import json
+from collections import Counter
 
 from django.contrib import messages
 from django.http import JsonResponse
@@ -185,6 +186,18 @@ def page_detail(request, batch_id, page_id):
             manual_year, manual_volume, manual_index = (
                 body[:4], str(int(body[4:6])), str(int(body[6:9])),
             )
+    if not manual_volume:
+        # Pre-fill the volume from the other pages in the batch if a strict
+        # majority of the resolved volume-start pages agree.
+        vols = Counter()
+        for other in page.batch.pages.all():
+            a = other.effective_arn
+            if a and not a.is_continuation:
+                vols[a.body[4:6]] += 1
+        if vols:
+            top, n = vols.most_common(1)[0]
+            if n * 2 > sum(vols.values()):
+                manual_volume = str(int(top))
     eff = page.effective_arn
     effective_label = _arn_labels(list(page.batch.pages.all())).get(page.id) or (
         eff.human_readable() if eff else ""

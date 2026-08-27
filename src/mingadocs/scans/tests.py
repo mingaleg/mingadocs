@@ -368,6 +368,19 @@ class ViewTests(TestCase):
         p.refresh_from_db()
         self.assertEqual(p.manual_arn, "ARN202600042")
 
+    def test_page_detail_prefills_volume_from_batch_majority(self):
+        b = services.start_batch()
+        services.stop_batch(b)
+        for pos, arn in ((10, "ARN202607001"), (20, "ARN202607002")):
+            ScanPage.objects.create(batch=b, position=pos,
+                                    scan_status=ScanPage.SCAN_DONE,
+                                    ocr_status=ScanPage.OCR_DONE,
+                                    detected_arn=arn)
+        p = ScanPage.objects.create(batch=b, position=30,
+                                    scan_status=ScanPage.SCAN_DONE)
+        r = self.client.get(f"/scans/{b.id}/pages/{p.id}/")
+        self.assertEqual(r.context["manual_volume"], "7")
+
     def test_page_arn_override_rejects_bad_index(self):
         b = services.start_batch()
         services.stop_batch(b)
