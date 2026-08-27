@@ -355,7 +355,7 @@ table.data th { color: var(--muted); font-weight: 600; font-size: .85rem; text-t
 .page-preview { max-width: 100%; border: 1px solid var(--border);
   border-radius: 8px; }
 
-.arn-fields { display: flex; gap: 6px; align-items: stretch; max-width: 340px; }
+.arn-fields { display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch; }
 .arn-fields input {
   padding: 8px 10px;
   border: 1px solid var(--border);
@@ -373,12 +373,20 @@ table.data th { color: var(--muted); font-weight: 600; font-size: .85rem; text-t
   background: var(--border);
   color: var(--muted);
 }
-.arn-fields #arn-year,
-.arn-fields #arn-volume,
-.arn-fields #arn-index {
+.arn-fields .stepper {
   width: auto;
+  max-width: none;
   flex: none;
-  padding-left: 6px;
-  padding-right: 6px;
-  text-align: center;
 }
+.arn-fields .stepper button { width: 26px; font-size: 1rem; }
+.arn-fields .stepper input {
+  width: 4ch;
+  min-width: 0;
+  max-width: none;
+  padding: 8px 4px;
+  text-align: center;
+  border-left: none;
+  border-right: none;
+  border-radius: 0;
+}
+.arn-fields #arn-year { width: 5ch; }

@@ -35,11 +35,11 @@
                  size="{{ config_prefix|length }}"
                  readonly tabindex="-1" aria-label="ARN prefix (fixed)">
           <input type="text" id="arn-year" inputmode="numeric" maxlength="4"
-                 size="4" value="{{ manual_year }}" aria-label="year">
+                 value="{{ manual_year }}" aria-label="year">
           <input type="text" id="arn-volume" inputmode="numeric" maxlength="2"
-                 size="3" value="{{ manual_volume }}" placeholder="vol" aria-label="vol">
+                 value="{{ manual_volume }}" placeholder="vol" aria-label="vol">
           <input type="text" id="arn-index" inputmode="numeric" maxlength="3"
-                 size="3" value="{{ manual_index }}" placeholder="idx" aria-label="idx">
+                 value="{{ manual_index }}" placeholder="idx" aria-label="idx">
         </span>
       </p>
       <div class="actions">
@@ -61,16 +61,45 @@
   var err = document.getElementById('err');
   var eff = document.getElementById('eff');
 
-  function padOnBlur(input, width) {
-    input.addEventListener('blur', function () {
-      var v = input.value.trim();
-      if (v !== '' && /^\d+$/.test(v)) {
-        input.value = v.padStart(width, '0').slice(-width);
-      }
-    });
+  // Number-like +/- steppers that keep the zero-padded display.
+  function makeStepper(input, min, max, pad) {
+    var wrap = document.createElement('span');
+    wrap.className = 'stepper';
+    input.parentNode.insertBefore(wrap, input);
+
+    function mkBtn(cls, sign, label) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = cls;
+      b.textContent = sign;
+      b.setAttribute('aria-label', label);
+      b.tabIndex = -1;
+      return b;
+    }
+    var dec = mkBtn('dec', '−', 'Decrease');
+    var inc = mkBtn('inc', '+', 'Increase');
+    wrap.appendChild(dec);
+    wrap.appendChild(input);
+    wrap.appendChild(inc);
+
+    function clamp(v) { return Math.max(min, Math.min(max, v)); }
+    function format() {
+      var v = parseInt(input.value, 10);
+      if (isNaN(v)) { return; }
+      input.value = String(clamp(v)).padStart(pad, '0');
+    }
+    function bump(delta) {
+      var v = parseInt(input.value, 10);
+      v = isNaN(v) ? min : v + delta;
+      input.value = String(clamp(v)).padStart(pad, '0');
+    }
+    dec.addEventListener('click', function () { bump(-1); });
+    inc.addEventListener('click', function () { bump(1); });
+    input.addEventListener('blur', format);
   }
-  padOnBlur(volumeInput, 2);
-  padOnBlur(indexInput, 3);
+  makeStepper(yearInput, 1000, 9999, 4);
+  makeStepper(volumeInput, 0, 99, 2);
+  makeStepper(indexInput, 0, 999, 3);
 
   document.querySelectorAll('[data-mode]').forEach(function (b) {
     b.addEventListener('click', function () {
