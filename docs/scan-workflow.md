@@ -95,6 +95,9 @@ the user:
 - **Mark as continuation** — the page becomes `PREFIX 000000000`.
 - **Clear override** — fall back to the detected value.
 
+Saving an ARN or marking a continuation returns to the batch review page;
+clearing the override stays on the page.
+
 Priority: manual continuation flag > manual ARN > detected ARN
 (`ScanPage.effective_arn`).
 

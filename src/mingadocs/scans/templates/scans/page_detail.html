@@ -142,6 +142,10 @@
             });
             return;
           }
+          if (b.dataset.mode === 'arn' || b.dataset.mode === 'continuation') {
+            location.href = "{% url 'scans:review' batch.id %}";
+            return;
+          }
           eff.textContent = d.page.arn_label || 'needs attention';
         });
     });
