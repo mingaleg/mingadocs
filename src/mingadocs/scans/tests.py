@@ -17,6 +17,7 @@ from PIL import Image
 from arnlabels.models import PrintSettings
 
 from . import jobs, ocr, services
+from . import scanner as scanner_mod
 from .models import Document, ScanBatch, ScanPage
 from .scanner import ScannerError, scan_page
 
@@ -80,21 +81,33 @@ class ScannerTests(TestCase):
             with self.assertRaises(ScannerError):
                 scan_page(mock.Mock(sane_device="", resolution_dpi=300, mode="Color"))
 
-    def test_retries_without_options_on_unrecognized_option(self):
+    def test_retries_with_fewer_options_on_failure(self):
         calls = []
 
         def fake_run(cmd, **kw):
             calls.append(cmd)
-            if "--resolution=300" in cmd or "--mode=Color" in cmd:
+            if "--mode=Color" in cmd:
                 return mock.Mock(returncode=1, stdout=b"",
-                                 stderr=b"scanimage: unrecognized option '--resolution=300'")
-            return mock.Mock(returncode=0, stdout=b"PNGDATA", stderr=b"")
+                                 stderr=b"scanimage: unrecognized option '--mode=Color'")
+            return mock.Mock(returncode=0, stdout=b"\x89PNG...", stderr=b"")
 
         with mock.patch("subprocess.run", side_effect=fake_run):
             out = scan_page(mock.Mock(sane_device="d", resolution_dpi=300, mode="Color"))
-        self.assertEqual(out, b"PNGDATA")
+        self.assertEqual(out, b"\x89PNG...")
         self.assertEqual(len(calls), 2)
-        self.assertNotIn("--resolution=300", calls[1])
+        self.assertIn("--resolution=300", calls[1])
+        self.assertNotIn("--mode=Color", calls[1])
+
+    def test_rejects_html_error_page_as_output(self):
+        with mock.patch("subprocess.run", return_value=mock.Mock(
+                returncode=0, stdout=b"<!DOCTYPE HTML><html>...", stderr=b"")):
+            with self.assertRaises(ScannerError):
+                scan_page(mock.Mock(sane_device="d", resolution_dpi=0, mode=""))
+
+    def test_no_device_selected_errors(self):
+        with mock.patch.object(scanner_mod, "list_devices", return_value=["a", "b"]):
+            with self.assertRaises(ScannerError):
+                scan_page(mock.Mock(sane_device="", resolution_dpi=300, mode="Color"))
 
 
 def run_scan_sync(page):

@@ -100,11 +100,19 @@ pages and no alerts.
 `scans/scanner.py` shells out to SANE's `scanimage`
 (`--format=png`, optional `-d <device>` first, then `--resolution` / `--mode`).
 
+- A device **must** be selectable: `sane_device` blank is only auto-resolved
+  when exactly one device exists. Otherwise the scan errors and asks the user
+  to pick one on the settings page — SANE's default device on a machine with a
+  webcam is usually that webcam, not the scanner.
 - `-d <device>` is passed **before** the device-specific options because
   `scanimage` only recognises `--resolution` / `--mode` once the backend is
-  loaded. If a backend rejects them (`unrecognized option`), the scan is
-  retried with just `--format=png`. `mode` may be left blank.
-- `scanimage` comes from the system package `sane-utils`.
+  loaded. On failure the scan is retried with fewer options (drop `--mode`,
+  then drop all), since a bad option *value* fails late with
+  `sane_start: Invalid argument`. `mode` may be left blank.
+- Output that looks like an HTML/XML error page (some network backends emit a
+  device web page on stdout) is rejected, not saved as an image.
+- `scanimage` comes from the system package `sane-utils`. Network MFPs: prefer
+  the `escl:` (AirScan) device over `hpaio:` where both are listed.
 - `list_devices()` parses `scanimage -L` for the settings page (best-effort).
 - **Dev / tests without hardware:** set `MINGADOCS_FAKE_SCANNER` to an image
   path; `scan_page` returns that file's bytes.

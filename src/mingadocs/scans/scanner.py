@@ -42,27 +42,60 @@ def scan_page(cfg) -> bytes:
         except OSError as exc:
             raise ScannerError(f"fake scanner file unreadable: {exc}") from exc
 
-    # Device-specific options (--resolution, --mode) are only recognised once
-    # the backend is loaded, so -d must come first. Not every backend supports
-    # them, so on an "unrecognized option" failure we retry without them.
-    base = ["scanimage", "--format=png"]
-    if cfg.sane_device:
-        base += ["-d", cfg.sane_device]
+    device = _resolve_device(cfg.sane_device)
+    dev = ["-d", device]
 
-    opts = []
+    # Try with resolution+mode, then drop mode, then drop everything: backends
+    # differ in which option names/values they accept, and a bad value fails
+    # late with "sane_start: Invalid argument" rather than a parse error.
+    opt_sets = []
+    full = []
     if cfg.resolution_dpi:
-        opts += [f"--resolution={cfg.resolution_dpi}"]
+        full += [f"--resolution={cfg.resolution_dpi}"]
     if cfg.mode:
-        opts += [f"--mode={cfg.mode}"]
+        full += [f"--mode={cfg.mode}"]
+    if full:
+        opt_sets.append(full)
+    if cfg.resolution_dpi and cfg.mode:
+        opt_sets.append([f"--resolution={cfg.resolution_dpi}"])
+    opt_sets.append([])
 
-    proc = _run(base + opts)
-    if proc.returncode != 0 and opts and b"unrecognized option" in proc.stderr:
-        proc = _run(base)
+    proc = None
+    for opts in opt_sets:
+        proc = _run(["scanimage", "--format=png", *dev, *opts])
+        if proc.returncode == 0 and _looks_like_image(proc.stdout):
+            return proc.stdout
 
-    if proc.returncode != 0 or not proc.stdout:
+    detail = "no output"
+    if proc is not None:
         detail = proc.stderr.decode("utf-8", "replace").strip() or "no output"
-        raise ScannerError(f"scanimage failed: {detail}")
-    return proc.stdout
+    raise ScannerError(f"scanimage failed: {detail}")
+
+
+def _resolve_device(configured: str) -> str:
+    """Return the SANE device to scan from.
+
+    A blank setting means "auto", but SANE's default device on a machine with a
+    webcam is often that webcam, so we only auto-pick when there is exactly one
+    device. Zero or many → ask the user to choose one on the settings page.
+    """
+    if configured:
+        return configured
+    devices = list_devices()
+    if len(devices) == 1:
+        return devices[0]
+    raise ScannerError(
+        "no scanner selected — pick one on the Scan settings page "
+        f"({len(devices)} devices found)"
+    )
+
+
+def _looks_like_image(data: bytes) -> bool:
+    if not data:
+        return False
+    head = data.lstrip()[:64].lower()
+    return not (head.startswith(b"<!doctype") or head.startswith(b"<html")
+                or head.startswith(b"<?xml"))
 
 
 def _run(cmd: list[str]) -> subprocess.CompletedProcess:
