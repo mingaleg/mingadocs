@@ -32,6 +32,7 @@
         <label for="arn-body">Set ARN</label>
         <span class="arn-fields">
           <input type="text" id="arn-prefix" value="{{ config_prefix }}"
+                 size="{{ config_prefix|length }}"
                  readonly tabindex="-1" aria-label="ARN prefix (fixed)">
           <input type="text" id="arn-body" inputmode="numeric" maxlength="9"
                  placeholder="9 digits, e.g. 202600042"

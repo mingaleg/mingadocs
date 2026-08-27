@@ -365,8 +365,10 @@ table.data th { color: var(--muted); font-weight: 600; font-size: .85rem; text-t
   font: inherit;
 }
 .arn-fields #arn-prefix {
-  width: 5.5ch;
+  width: auto;
   flex: none;
+  padding-left: 6px;
+  padding-right: 6px;
   text-align: center;
   background: var(--border);
   color: var(--muted);
