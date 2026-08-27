@@ -7,34 +7,64 @@
   paper back in and group it into archival document PDFs.
 </p>
 
-<div class="grid-2">
-  <a class="tile" href="{% url 'arnlabels:label-utility' %}">
-    <div class="tile-title">Print labels &rarr;</div>
-    <div class="tile-sub">
-      Volume page for {{ suggestion.year }} / vol
-      {{ suggestion.volume|stringformat:"02d" }}, or a continuation sheet.
-    </div>
-  </a>
-  <a class="tile" href="{% url 'scans:batch-list' %}">
-    <div class="tile-title">Scan intake &rarr;</div>
-    <div class="tile-sub">
-      {% if active_batches %}
-        {{ active_batches }} batch{{ active_batches|pluralize:"es" }} in flight{% if scanning_batches %}, {{ scanning_batches }} scanning{% endif %}.
-      {% else %}
-        No batches in flight — start a new one.
-      {% endif %}
-    </div>
-  </a>
-  <a class="tile" href="{% url 'scans:document-list' %}">
-    <div class="tile-title">Documents &rarr;</div>
-    <div class="tile-sub">
-      {{ document_count }} finalized document{{ document_count|pluralize }}.
-    </div>
-  </a>
-  <a class="tile" href="{% url 'scans:settings' %}#labels">
-    <div class="tile-title">Settings &rarr;</div>
-    <div class="tile-sub">Prefix, printer and print behaviour.</div>
-  </a>
+<div class="card">
+  <h2>Scan intake
+    <a href="{% url 'scans:batch-list' %}" class="btn secondary small">View all</a>
+  </h2>
+  {% if active_batches %}
+    <table class="data">
+      <thead><tr><th>Batch</th><th>Status</th><th>Started</th><th>Pages</th></tr></thead>
+      <tbody>
+        {% for b in active_batches %}
+          <tr>
+            <td><a href="{% if b.status == 'scanning' %}{% url 'scans:console' b.id %}{% else %}{% url 'scans:review' b.id %}{% endif %}">#{{ b.id }}</a></td>
+            <td><span class="pill {% if b.status == 'review' %}off{% endif %}">{{ b.get_status_display }}</span></td>
+            <td>{{ b.created_at|date:"Y-m-d H:i" }}</td>
+            <td>{{ b.pages.count }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% elif recent_batches %}
+    <p class="empty">No batches in flight. Last finalized:</p>
+    <table class="data">
+      <thead><tr><th>Batch</th><th>Finalized</th><th>Documents</th></tr></thead>
+      <tbody>
+        {% for b in recent_batches %}
+          <tr>
+            <td>#{{ b.id }}</td>
+            <td>{{ b.finalized_at|date:"Y-m-d H:i"|default:"—" }}</td>
+            <td>{{ b.documents.count }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">No scan batches yet.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Recent documents
+    <a href="{% url 'scans:document-list' %}" class="btn secondary small">View all</a>
+  </h2>
+  {% if recent_documents %}
+    <table class="data">
+      <thead><tr><th>ARN</th><th>Pages</th><th>Created</th><th>PDF</th></tr></thead>
+      <tbody>
+        {% for d in recent_documents %}
+          <tr>
+            <td>{{ d.start_arn }}</td>
+            <td>{{ d.page_count }}</td>
+            <td>{{ d.created_at|date:"Y-m-d H:i" }}</td>
+            <td>{% if d.pdf %}<a href="{{ d.pdf.url }}" target="_blank">open</a>{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">No documents finalized yet.</p>
+  {% endif %}
 </div>
 
 <div class="card">
@@ -72,29 +102,6 @@
     </table>
   {% else %}
     <p class="empty">No volume pages generated yet.</p>
-  {% endif %}
-</div>
-
-<div class="card">
-  <h2>Recent documents
-    <a href="{% url 'scans:document-list' %}" class="btn secondary small">View all</a>
-  </h2>
-  {% if recent_documents %}
-    <table class="data">
-      <thead><tr><th>ARN</th><th>Pages</th><th>Created</th><th>PDF</th></tr></thead>
-      <tbody>
-        {% for d in recent_documents %}
-          <tr>
-            <td>{{ d.start_arn }}</td>
-            <td>{{ d.page_count }}</td>
-            <td>{{ d.created_at|date:"Y-m-d H:i" }}</td>
-            <td>{% if d.pdf %}<a href="{{ d.pdf.url }}" target="_blank">open</a>{% endif %}</td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p class="empty">No documents finalized yet.</p>
   {% endif %}
 </div>
 {% endblock %}

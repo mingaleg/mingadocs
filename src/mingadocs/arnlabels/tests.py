@@ -106,9 +106,10 @@ class ViewTests(TestCase):
         Document.objects.create(start_arn="11037202600042", page_count=3)
         r = self.client.get("/")
         self.assertContains(r, "Scan intake")
-        self.assertContains(r, "Documents")
-        self.assertContains(r, "1 finalized document")
+        self.assertContains(r, "Recent documents")
         self.assertContains(r, "11037202600042")
+        # The redundant tile shortcuts (all present in the top nav) are gone.
+        self.assertNotContains(r, 'class="tile"')
 
     def test_pages_ok(self):
         self.assertEqual(self.client.get("/labels/").status_code, 200)

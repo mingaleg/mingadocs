@@ -25,14 +25,12 @@ def index(request):
             "nav": "index",
             "config": config,
             "template": services.current_template(),
-            "suggestion": services.suggest_volume_defaults(),
             "recent": VolumeAllocation.objects.all()[:8],
-            "active_batches": active_batches.count(),
-            "scanning_batches": active_batches.filter(
-                status=ScanBatch.SCANNING
-            ).count(),
-            "document_count": Document.objects.count(),
-            "recent_documents": Document.objects.all()[:8],
+            "active_batches": active_batches,
+            "recent_batches": ScanBatch.objects.filter(
+                status=ScanBatch.FINALIZED
+            )[:5],
+            "recent_documents": Document.objects.all()[:6],
         },
     )
 

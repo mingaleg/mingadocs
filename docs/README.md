@@ -49,8 +49,9 @@ poetry run python src/mingadocs/manage.py migrate
 poetry run python src/mingadocs/manage.py runserver
 ```
 
-- Overview:        `/` — tiles for print / scan / documents / settings, plus
-  recent volume and recent document activity
+- Overview:        `/` — current configuration plus live islands for scan
+  batches in flight, recent documents and recent volume activity (each with a
+  right-aligned "View all"); navigation lives in the top bar
 - Label utility:   `/labels/`
 - Scan intake:     `/scans/`
 - Documents:       `/scans/documents/`
