@@ -6,6 +6,8 @@ from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
+from scans.models import Document, ScanBatch
+
 from . import printing, services
 from .forms import LabelBatchForm
 from .models import PrintSettings, VolumeAllocation
@@ -13,8 +15,9 @@ from .services import PAGE_VOLUME
 
 
 def index(request):
-    """Landing page: current configuration and recent volume activity."""
+    """Landing page: current configuration and recent volume / scan activity."""
     config = PrintSettings.get_solo()
+    active_batches = ScanBatch.objects.exclude(status=ScanBatch.FINALIZED)
     return render(
         request,
         "arnlabels/index.html",
@@ -24,6 +27,12 @@ def index(request):
             "template": services.current_template(),
             "suggestion": services.suggest_volume_defaults(),
             "recent": VolumeAllocation.objects.all()[:8],
+            "active_batches": active_batches.count(),
+            "scanning_batches": active_batches.filter(
+                status=ScanBatch.SCANNING
+            ).count(),
+            "document_count": Document.objects.count(),
+            "recent_documents": Document.objects.all()[:8],
         },
     )
 

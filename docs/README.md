@@ -49,9 +49,11 @@ poetry run python src/mingadocs/manage.py migrate
 poetry run python src/mingadocs/manage.py runserver
 ```
 
-- Overview:        `/`
+- Overview:        `/` — tiles for print / scan / documents / settings, plus
+  recent volume and recent document activity
 - Label utility:   `/labels/`
 - Scan intake:     `/scans/`
+- Documents:       `/scans/documents/`
 - Settings:         `/scans/settings/` — unified page, `#labels` + `#scanner`
   sections (also in Django admin). `/labels/settings/` redirects here.
 

@@ -100,6 +100,16 @@ class ViewTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertTemplateUsed(r, "arnlabels/index.html")
 
+    def test_index_shows_scan_and_document_islands(self):
+        from scans.models import Document
+
+        Document.objects.create(start_arn="11037202600042", page_count=3)
+        r = self.client.get("/")
+        self.assertContains(r, "Scan intake")
+        self.assertContains(r, "Documents")
+        self.assertContains(r, "1 finalized document")
+        self.assertContains(r, "11037202600042")
+
     def test_pages_ok(self):
         self.assertEqual(self.client.get("/labels/").status_code, 200)
 
