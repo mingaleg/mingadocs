@@ -238,6 +238,7 @@ form ul label { font-weight: 400; margin-left: 6px; }
   flex-wrap: wrap;
   margin-top: 22px;
 }
+.actions:not(:last-child) { margin-bottom: 22px; }
 
 button, .btn {
   appearance: none;
