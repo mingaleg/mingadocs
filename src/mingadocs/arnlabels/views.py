@@ -6,7 +6,7 @@ from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
-from scans.models import Document, ScanBatch
+from scans.models import Document, ScanBatch, ScanSettings
 
 from . import printing, services
 from .forms import LabelBatchForm
@@ -24,6 +24,7 @@ def index(request):
         {
             "nav": "index",
             "config": config,
+            "scan_config": ScanSettings.get_solo(),
             "template": services.current_template(),
             "recent": VolumeAllocation.objects.all()[:8],
             "active_batches": active_batches,

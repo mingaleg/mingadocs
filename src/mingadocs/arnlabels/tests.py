@@ -112,6 +112,13 @@ class ViewTests(TestCase):
         # The redundant tile shortcuts (all present in the top nav) are gone.
         self.assertNotContains(r, 'class="tile"')
 
+    def test_index_configuration_card_covers_printer_and_scanner(self):
+        r = self.client.get("/")
+        self.assertContains(r, "Printer")
+        self.assertContains(r, "Scanner")
+        self.assertContains(r, "OCR timeout")
+        self.assertContains(r, 'href="/settings/"')  # Edit button
+
     def test_pages_ok(self):
         self.assertEqual(self.client.get("/labels/").status_code, 200)
 

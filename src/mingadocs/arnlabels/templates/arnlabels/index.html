@@ -68,7 +68,9 @@
 </div>
 
 <div class="card">
-  <h2>Current configuration</h2>
+  <h2>Current configuration
+    <a href="{% url 'siteconfig:settings' %}" class="btn secondary small">Edit</a>
+  </h2>
   <dl class="facts">
     <dt>ARN prefix</dt><dd>{{ config.arn_prefix }}</dd>
     <dt>Label stock</dt><dd>{{ template.name }} ({{ template.labels_per_sheet }} / sheet)</dd>
@@ -80,6 +82,20 @@
       {% else %}
         <span class="pill off">not set — download only</span>
       {% endif %}
+    </dd>
+    <dt>Scanner</dt>
+    <dd>
+      {% if scan_config.sane_device %}
+        {{ scan_config.sane_device }}
+      {% else %}
+        <span class="pill off">SANE default</span>
+      {% endif %}
+    </dd>
+    <dt>Scan mode</dt>
+    <dd>
+      {{ scan_config.resolution_dpi }} dpi ·
+      {{ scan_config.mode|default:"backend default" }} ·
+      OCR timeout {{ scan_config.ocr_timeout_seconds }} s
     </dd>
   </dl>
 </div>
