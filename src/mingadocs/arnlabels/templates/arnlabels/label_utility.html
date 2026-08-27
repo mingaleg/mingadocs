@@ -1,0 +1,22 @@
+{% extends "arnlabels/base.html" %}
+{% block title %}Print ARN labels{% endblock %}
+{% block content %}
+<h1>Print ARN labels</h1>
+
+<p>
+  Prefix <strong>{{ config.arn_prefix }}</strong> &middot;
+  Sheet <strong>{{ template.name }}</strong>
+  ({{ template.labels_per_sheet }} labels) &middot;
+  Printer
+  <strong>{{ config.cups_printer|default:"(none - download only)" }}</strong>
+  &middot; <a href="{% url 'arnlabels:print-settings' %}">change</a>
+</p>
+
+<form method="post">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  {{ form.as_p }}
+  <p><em>Volume-page fields are ignored for a continuation page.</em></p>
+  <button type="submit">Generate</button>
+</form>
+{% endblock %}
