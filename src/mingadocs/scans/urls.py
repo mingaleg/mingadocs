@@ -7,6 +7,7 @@ app_name = "scans"
 urlpatterns = [
     path("", views.batch_list, name="batch-list"),
     path("new/", views.new_batch, name="new-batch"),
+    path("documents/", views.document_list, name="document-list"),
     path("settings/", views.settings_page, name="settings"),
     path("<int:batch_id>/", views.batch_console, name="console"),
     path("<int:batch_id>/review/", views.batch_review, name="review"),

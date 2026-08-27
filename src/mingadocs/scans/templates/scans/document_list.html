@@ -1,0 +1,31 @@
+{% extends "arnlabels/base.html" %}
+{% block title %}Documents · mingadocs{% endblock %}
+{% block content %}
+<h1>Documents</h1>
+<p class="lede">
+  Every finalized document, newest first. {{ documents|length }} total.
+</p>
+
+<div class="card">
+  {% if documents %}
+    <table class="data">
+      <thead>
+        <tr><th>ARN</th><th>Pages</th><th>Created</th><th>Batch</th><th>PDF</th></tr>
+      </thead>
+      <tbody>
+      {% for doc, label in documents %}
+        <tr>
+          <td>{{ label }}</td>
+          <td>{{ doc.page_count }}</td>
+          <td>{{ doc.created_at|date:"Y-m-d H:i" }}</td>
+          <td>{% if doc.batch_id %}#{{ doc.batch_id }}{% else %}—{% endif %}</td>
+          <td>{% if doc.pdf %}<a href="{{ doc.pdf.url }}" target="_blank">open</a>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">No documents yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

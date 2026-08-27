@@ -41,7 +41,7 @@
 </div>
 
 <div class="card">
-  <h2>Recent documents</h2>
+  <h2>Recent documents <a href="{% url 'scans:document-list' %}" class="btn secondary small">View all</a></h2>
   {% if documents %}
     <table class="data">
       <thead><tr><th>ARN</th><th>Pages</th><th>Created</th><th>PDF</th></tr></thead>

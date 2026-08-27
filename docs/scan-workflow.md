@@ -12,7 +12,8 @@ Implemented in the `scans` Django app.
 - **Scan page** (`ScanPage`) — one acquired image plus its scan/OCR status and
   detected / manually-set ARN.
 - **Document** (`Document`) — a finalized multi-page PDF: a volume-start ARN
-  page followed by its continuation pages.
+  page followed by its continuation pages. `GET /scans/documents/` lists them
+  all (ARN, page count, date, source batch, PDF link).
 
 ## Batch states
 
@@ -172,9 +173,9 @@ The ARN **prefix** is shared with label printing (`arnlabels.PrintSettings`).
 | `scans/ocr.py`       | Code 128 → ARN detection (`zxing-cpp`) |
 | `scans/jobs.py`      | Background scan/OCR workers, restart recovery |
 | `scans/services.py`  | Batch lifecycle, alerts, finalization |
-| `scans/views.py`     | Console, review, page detail, settings, JSON endpoints |
+| `scans/views.py`     | Console, review, page detail, document list, settings, JSON endpoints |
 | `scans/forms.py`     | `ScanSettingsForm`, `PageArnForm` |
-| `scans/templates/scans/` | 5 templates, extend `arnlabels/base.html` |
+| `scans/templates/scans/` | 6 templates, extend `arnlabels/base.html` |
 
 Shared CSS lives in `arnlabels/static/arnlabels/app.css` (`.thumb-grid`,
 `.modal`, `.alert-list`, …).

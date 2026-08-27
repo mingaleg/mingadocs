@@ -302,6 +302,14 @@ class ViewTests(TestCase):
         self.assertContains(r, 'id="labels"')
         self.assertContains(r, 'id="scanner"')
 
+    def test_document_list_page(self):
+        b = services.start_batch()
+        services.stop_batch(b)
+        Document.objects.create(start_arn="ARN202600042", page_count=3, batch=b)
+        r = self.client.get("/scans/documents/")
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "ARN 202600042")
+
     def test_old_label_settings_url_redirects(self):
         r = self.client.get("/labels/settings/")
         self.assertRedirects(r, "/scans/settings/#labels",
