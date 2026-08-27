@@ -152,13 +152,46 @@ form select {
   color: var(--text);
   font: inherit;
 }
-/* Drop the native number spinners - they clash with the field styling. */
+/* Replace the native number spinners with the bespoke .stepper (see base.html). */
 form input[type=number] { appearance: textfield; -moz-appearance: textfield; }
 form input[type=number]::-webkit-outer-spin-button,
 form input[type=number]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+
+.stepper {
+  display: inline-flex;
+  align-items: stretch;
+  width: 100%;
+  max-width: 180px;
+}
+.stepper input[type=number] {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: none;
+  text-align: center;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+}
+.stepper button {
+  appearance: none;
+  flex: none;
+  width: 36px;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.stepper button:hover { background: var(--surface); }
+.stepper button:active { background: var(--border); }
+.stepper button.dec { border-radius: 8px 0 0 8px; }
+.stepper button.inc { border-radius: 0 8px 8px 0; }
 
 form ul { list-style: none; padding: 0; margin: 4px 0; }
 form ul li { margin: 2px 0; }
