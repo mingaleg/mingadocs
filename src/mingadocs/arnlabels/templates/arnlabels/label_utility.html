@@ -55,9 +55,11 @@
       {% if default_output == "print" %}
         <button type="submit" name="output" value="print" class="btn"
                 {% if not can_print %}disabled{% endif %}>Send to printer</button>
-        <button type="submit" name="output" value="pdf" class="btn secondary">Render PDF</button>
+        <button type="submit" name="output" value="pdf" formtarget="_blank"
+                class="btn secondary">Render PDF</button>
       {% else %}
-        <button type="submit" name="output" value="pdf" class="btn">Render PDF</button>
+        <button type="submit" name="output" value="pdf" formtarget="_blank"
+                class="btn">Render PDF</button>
         <button type="submit" name="output" value="print" class="btn secondary"
                 {% if not can_print %}disabled{% endif %}>Send to printer</button>
       {% endif %}

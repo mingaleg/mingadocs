@@ -151,10 +151,11 @@ Editable on `/labels/settings/` and in the Django admin.
 - The server generates the PDF with `reportlab`.
 - **Default:** submit the PDF straight to the configured CUPS queue via
   `pycups` (`arnlabels/printing.py`). No client-side print dialog.
-- **Always available:** a "Render PDF" option that returns the same PDF as an
-  `application/pdf` response with `Content-Disposition: inline` — it opens in
-  the browser's PDF viewer; the `arn-<year>-<vol>.pdf` filename is kept for when
-  the user saves it.
+- **Always available:** a "Render PDF" option (`formtarget="_blank"`) that
+  returns the same PDF as an `application/pdf` response with
+  `Content-Disposition: inline` — it opens in a **new browser tab** in the PDF
+  viewer; the `arn-<year>-<vol>.pdf` filename is kept for when the user saves
+  it. "Send to printer" stays in the same tab (redirect + flash message).
 - If no `cups_printer` is configured, only "Render PDF" is offered.
 - The settings page lists available CUPS queues (`printing.list_printers()`)
   to choose from.
