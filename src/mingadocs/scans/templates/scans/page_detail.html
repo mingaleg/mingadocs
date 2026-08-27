@@ -22,17 +22,21 @@
         <dt>OCR</dt><dd>{{ page.ocr_status }}{% if page.ocr_note %} — {{ page.ocr_note }}{% endif %}</dd>
         <dt>Barcode</dt><dd>{{ page.detected_arn|default:"—" }}</dd>
         <dt>Effective</dt>
-        <dd id="eff">{% if page.effective_arn %}{{ page.effective_arn.human_readable }}{% else %}<span class="pill err">needs attention</span>{% endif %}</dd>
+        <dd id="eff">{% if page.effective_arn %}{{ effective_label }}{% else %}<span class="pill err">needs attention</span>{% endif %}</dd>
       </dl>
     </div>
     <div class="card">
       <h2>Override</h2>
       <ul class="errorlist" id="err" hidden></ul>
       <p>
-        <label for="arn-input">Set ARN</label>
-        <input type="text" id="arn-input"
-               placeholder="{{ config_prefix }} + 9 digits, e.g. {{ config_prefix }}202600042"
-               value="{{ page.manual_arn }}">
+        <label for="arn-body">Set ARN</label>
+        <span class="arn-fields">
+          <input type="text" id="arn-prefix" value="{{ config_prefix }}"
+                 readonly tabindex="-1" aria-label="ARN prefix (fixed)">
+          <input type="text" id="arn-body" inputmode="numeric" maxlength="9"
+                 placeholder="9 digits, e.g. 202600042"
+                 value="{{ manual_body }}">
+        </span>
       </p>
       <div class="actions">
         <button type="button" data-mode="arn">Save ARN</button>
@@ -46,7 +50,8 @@
 <script>
 (function () {
   var url = "{% url 'scans:page-arn' batch.id page.id %}";
-  var input = document.getElementById('arn-input');
+  var prefixInput = document.getElementById('arn-prefix');
+  var bodyInput = document.getElementById('arn-body');
   var err = document.getElementById('err');
   var eff = document.getElementById('eff');
 
@@ -55,7 +60,8 @@
       err.hidden = true; err.innerHTML = '';
       var body = new URLSearchParams();
       body.set('mode', b.dataset.mode);
-      body.set('arn', input.value);
+      body.set('arn_prefix', prefixInput.value);
+      body.set('arn_body', bodyInput.value);
       fetch(url, {
         method: 'POST',
         headers: {
@@ -77,7 +83,7 @@
             });
             return;
           }
-          eff.textContent = d.page.arn || 'needs attention';
+          eff.textContent = d.page.arn_label || 'needs attention';
         });
     });
   });

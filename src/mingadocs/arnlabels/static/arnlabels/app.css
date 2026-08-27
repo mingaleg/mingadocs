@@ -354,3 +354,21 @@ table.data th { color: var(--muted); font-weight: 600; font-size: .85rem; text-t
 
 .page-preview { max-width: 100%; border: 1px solid var(--border);
   border-radius: 8px; }
+
+.arn-fields { display: flex; gap: 6px; align-items: stretch; max-width: 340px; }
+.arn-fields input {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+.arn-fields #arn-prefix {
+  width: 5.5ch;
+  flex: none;
+  text-align: center;
+  background: var(--border);
+  color: var(--muted);
+}
+.arn-fields #arn-body { flex: 1; letter-spacing: .08em; }

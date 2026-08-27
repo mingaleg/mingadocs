@@ -338,6 +338,46 @@ class ViewTests(TestCase):
             r = self.client.post(f"/scans/{b.id}/scan/")
         self.assertEqual(r.status_code, 409)
 
+    def test_continuation_pages_labelled_page_n(self):
+        b = services.start_batch()
+        services.stop_batch(b)
+        ScanPage.objects.create(batch=b, position=10,
+                                scan_status=ScanPage.SCAN_DONE,
+                                ocr_status=ScanPage.OCR_DONE,
+                                detected_arn="ARN202600001")
+        for pos in (20, 30):
+            ScanPage.objects.create(batch=b, position=pos,
+                                    scan_status=ScanPage.SCAN_DONE,
+                                    ocr_status=ScanPage.OCR_DONE,
+                                    manual_continuation=True)
+        pages = self.client.get(f"/scans/{b.id}/status/").json()["pages"]
+        self.assertEqual([p["arn_label"] for p in pages],
+                         ["ARN 202600001", "page 2", "page 3"])
+
+    def test_page_arn_override_takes_split_prefix_and_body(self):
+        b = services.start_batch()
+        services.stop_batch(b)
+        p = ScanPage.objects.create(batch=b, position=10,
+                                    scan_status=ScanPage.SCAN_DONE,
+                                    ocr_status=ScanPage.OCR_DONE)
+        r = self.client.post(f"/scans/{b.id}/pages/{p.id}/arn/", {
+            "mode": "arn", "arn_prefix": "ARN", "arn_body": "202600042",
+        })
+        self.assertEqual(r.status_code, 200)
+        p.refresh_from_db()
+        self.assertEqual(p.manual_arn, "ARN202600042")
+
+    def test_page_arn_override_rejects_bad_body(self):
+        b = services.start_batch()
+        services.stop_batch(b)
+        p = ScanPage.objects.create(batch=b, position=10,
+                                    scan_status=ScanPage.SCAN_DONE)
+        r = self.client.post(f"/scans/{b.id}/pages/{p.id}/arn/", {
+            "mode": "arn", "arn_prefix": "ARN", "arn_body": "12",
+        })
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("arn_body", r.json()["errors"])
+
     def test_finalize_conflict_with_alerts(self):
         b = services.start_batch()
         services.stop_batch(b)

@@ -73,7 +73,7 @@
         cell.innerHTML =
           '<img src="' + p.thumb_url + '" alt="page ' + p.position + '">' +
           '<div class="thumb-meta"><span class="thumb-arn">' +
-          (p.arn || ocrLabel(p)) + '</span></div>';
+          (p.arn_label || ocrLabel(p)) + '</span></div>';
       }
       grid.appendChild(cell);
     });

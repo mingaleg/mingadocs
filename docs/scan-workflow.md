@@ -72,12 +72,20 @@ ARN Code 128 is otherwise never located in the full image.
 by a crash are marked failed. A half-scanned page is **never** auto re-scanned
 (that could double-feed a sheet-fed scanner) — the user just scans again.
 
+## Display labels
+
+In the console and review grids a volume-start page shows its ARN
+(`PREFIX 202600042`); a continuation page shows `page N`, its 1-based position
+within the document it continues (`views._arn_labels`, carried in the status
+JSON as `arn_label`). Pages with no effective ARN fall back to the OCR note.
+
 ## Manual override
 
 `/scans/<id>/pages/<pid>/` shows the full image and lets the user:
 
-- **Set ARN** — typed `PREFIX + 9 digits` (spaces ignored), validated by
-  `Arn.parse`.
+- **Set ARN** — the prefix is shown pre-filled and read-only; the user types
+  only the 9-digit body. Posted as `arn_prefix` / `arn_body`; the configured
+  prefix always wins and the combined value is validated by `Arn.parse`.
 - **Mark as continuation** — the page becomes `PREFIX 000000000`.
 - **Clear override** — fall back to the detected value.
 

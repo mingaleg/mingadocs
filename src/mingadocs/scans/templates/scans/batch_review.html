@@ -57,7 +57,7 @@
         '<button type="button" class="remove" title="Remove">✕</button>' +
         (p.thumb_url ? '<img src="' + p.thumb_url + '" alt="page ' + p.position + '">' : '') +
         '<div class="thumb-meta"><span class="thumb-arn">' +
-        (p.arn || '— ' + (p.ocr_note || 'no ARN') + ' —') + '</span>' +
+        (p.arn_label || '— ' + (p.ocr_note || 'no ARN') + ' —') + '</span>' +
         ' <a href="' + p.detail_url + '">edit</a></div>';
       cell.querySelector('.remove').addEventListener('click', function (e) {
         e.stopPropagation();

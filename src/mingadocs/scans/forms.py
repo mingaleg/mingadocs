@@ -36,17 +36,22 @@ class PageArnForm(forms.Form):
     ]
 
     mode = forms.ChoiceField(choices=MODE_CHOICES)
-    arn = forms.CharField(required=False)
+    # The prefix is global and permanent; it is shown pre-filled and read-only
+    # in the UI, and whatever is posted is ignored in favour of the configured
+    # value. Only the 9-digit body is really entered by hand.
+    arn_prefix = forms.CharField(required=False)
+    arn_body = forms.CharField(required=False)
 
     def clean(self):
         cleaned = super().clean()
         if cleaned.get("mode") == self.MODE_ARN:
             prefix = PrintSettings.get_solo().arn_prefix
-            raw = (cleaned.get("arn") or "").strip().replace(" ", "")
+            body = (cleaned.get("arn_body") or "").strip().replace(" ", "")
+            raw = f"{prefix}{body}"
             try:
                 Arn.parse(raw, prefix)
             except ValueError as exc:
-                self.add_error("arn", str(exc))
+                self.add_error("arn_body", str(exc))
             else:
                 cleaned["arn"] = raw
         return cleaned

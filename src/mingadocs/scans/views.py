@@ -16,8 +16,9 @@ from arnlabels.models import PrintSettings
 from .models import Document, ScanBatch, ScanPage, ScanSettings
 
 
-def _page_json(page: ScanPage) -> dict:
+def _page_json(page: ScanPage, arn_label: str | None = None) -> dict:
     arn = page.effective_arn
+    human = arn.human_readable() if arn else ""
     return {
         "id": page.id,
         "position": page.position,
@@ -25,7 +26,10 @@ def _page_json(page: ScanPage) -> dict:
         "image_url": page.image.url if page.image else "",
         "scan_status": page.scan_status,
         "ocr_status": page.ocr_status,
-        "arn": arn.human_readable() if arn else "",
+        "arn": human,
+        # Display label: the ARN for a volume-start page, "page N" for a
+        # continuation (its 1-based position within its document).
+        "arn_label": human if arn_label is None else arn_label,
         "arn_source": page.arn_source,
         "ocr_note": page.ocr_note,
         "needs_attention": page.needs_attention,
@@ -33,12 +37,31 @@ def _page_json(page: ScanPage) -> dict:
     }
 
 
+def _arn_labels(pages) -> dict[int, str]:
+    """Map page id -> display label, numbering continuation pages within a doc."""
+    labels: dict[int, str] = {}
+    doc_page = 0
+    for page in pages:
+        arn = page.effective_arn
+        if arn is None:
+            labels[page.id] = ""
+        elif arn.is_continuation:
+            doc_page += 1
+            labels[page.id] = f"page {doc_page}"
+        else:
+            doc_page = 1
+            labels[page.id] = arn.human_readable()
+    return labels
+
+
 def _status_payload(batch: ScanBatch) -> dict:
     alerts = services.compute_alerts(batch)
+    pages = list(batch.pages.all())
+    labels = _arn_labels(pages)
     return {
         "status": batch.status,
         "scan_in_progress": services.scan_in_progress(batch),
-        "pages": [_page_json(p) for p in batch.pages.all()],
+        "pages": [_page_json(p, labels.get(p.id)) for p in pages],
         "alerts": [
             {"level": a.level, "page_id": a.page_id, "code": a.code,
              "message": a.message}
@@ -151,10 +174,20 @@ def finalize(request, batch_id):
 
 def page_detail(request, batch_id, page_id):
     page = get_object_or_404(ScanPage, pk=page_id, batch_id=batch_id)
+    prefix = PrintSettings.get_solo().arn_prefix
+    manual_body = ""
+    if page.manual_arn.startswith(prefix):
+        manual_body = page.manual_arn[len(prefix):]
+    eff = page.effective_arn
+    effective_label = _arn_labels(list(page.batch.pages.all())).get(page.id) or (
+        eff.human_readable() if eff else ""
+    )
     return render(request, "scans/page_detail.html", {
         "nav": "scans", "batch": page.batch, "page": page,
         "form": PageArnForm(),
-        "config_prefix": PrintSettings.get_solo().arn_prefix,
+        "config_prefix": prefix,
+        "manual_body": manual_body,
+        "effective_label": effective_label,
     })
 
 
@@ -172,8 +205,10 @@ def page_arn(request, batch_id, page_id):
         clear=(mode == PageArnForm.MODE_CLEAR),
     )
     page.refresh_from_db()
+    pages = list(page.batch.pages.all())
+    labels = _arn_labels(pages)
     return JsonResponse({
-        "page": _page_json(page),
+        "page": _page_json(page, labels.get(page.id)),
         "alerts": _status_payload(page.batch)["alerts"],
     })
 
