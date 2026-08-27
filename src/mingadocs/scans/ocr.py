@@ -44,19 +44,44 @@ _BINARIZERS = (
     zxingcpp.Binarizer.GlobalHistogram,
 )
 
+# This build of zxing-cpp stops scanning a page once it has found a symbol (it
+# has no "read every barcode" mode), so on a page that also carries a Data
+# Matrix or other code the small ARN Code 128 is often never located in the
+# full image even though it decodes fine from a crop. Scan the whole page and
+# then a grid of overlapping tiles, and union every Code 128 hit.
+_TILES_X = 2
+_TILES_Y = 3
+_TILE_OVERLAP = 0.12
+
+
+def _regions(img: Image.Image):
+    yield img
+    w, h = img.size
+    ox, oy = int(w * _TILE_OVERLAP), int(h * _TILE_OVERLAP)
+    for iy in range(_TILES_Y):
+        for ix in range(_TILES_X):
+            box = (
+                max(0, w * ix // _TILES_X - ox),
+                max(0, h * iy // _TILES_Y - oy),
+                min(w, w * (ix + 1) // _TILES_X + ox),
+                min(h, h * (iy + 1) // _TILES_Y + oy),
+            )
+            yield img.crop(box)
+
 
 def _scan_code128(img: Image.Image, prefix: str) -> set[str]:
     found: set[str] = set()
-    for binarizer in _BINARIZERS:
-        try:
-            results = zxingcpp.read_barcodes(
-                img,
-                formats=zxingcpp.BarcodeFormat.Code128,
-                binarizer=binarizer,
-            )
-        except Exception:  # noqa: BLE001 - a bad pass must not sink detection
-            continue
-        for r in results:
-            if r.text.startswith(prefix):
-                found.add(r.text)
+    for region in _regions(img):
+        for binarizer in _BINARIZERS:
+            try:
+                results = zxingcpp.read_barcodes(
+                    region,
+                    formats=zxingcpp.BarcodeFormat.Code128,
+                    binarizer=binarizer,
+                )
+            except Exception:  # noqa: BLE001 - a bad pass must not sink detection
+                continue
+            for r in results:
+                if r.text.startswith(prefix):
+                    found.add(r.text)
     return found

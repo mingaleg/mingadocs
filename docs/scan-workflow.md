@@ -57,10 +57,13 @@ Only Code 128 symbols whose text starts with the configured `PrintSettings`
 prefix are considered. **Exactly one** match → that ARN. Zero or more than one
 → the page has no ARN assigned and must be resolved by hand.
 
-`ocr.detect_arn` runs `zxingcpp.read_barcodes` once per binarizer
-(`LocalAverage`, `FixedThreshold`, `GlobalHistogram`) and unions the hits: the
-default `LocalAverage` binarizer sometimes misses a crisp barcode on a
-full-resolution flatbed scan that a fixed threshold reads cleanly.
+`ocr.detect_arn` runs `zxingcpp.read_barcodes` (Code 128 only) once per
+binarizer (`LocalAverage`, `FixedThreshold`, `GlobalHistogram`) over the whole
+page **and** over a 2×3 grid of overlapping tiles, then unions the hits. Two
+reasons: the default `LocalAverage` binarizer sometimes misses a crisp barcode
+that a fixed threshold reads cleanly, and this build of zxing-cpp stops after
+the first symbol it finds — on a page that also carries a Data Matrix the small
+ARN Code 128 is otherwise never located in the full image.
 
 ### Restart recovery
 
