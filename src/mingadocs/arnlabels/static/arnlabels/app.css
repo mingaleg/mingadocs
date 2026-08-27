@@ -373,4 +373,6 @@ table.data th { color: var(--muted); font-weight: 600; font-size: .85rem; text-t
   background: var(--border);
   color: var(--muted);
 }
-.arn-fields #arn-body { flex: 1; letter-spacing: .08em; }
+.arn-fields #arn-year { width: 6ch; flex: none; text-align: center; }
+.arn-fields #arn-volume { width: 4ch; flex: none; text-align: center; }
+.arn-fields #arn-index { width: 5ch; flex: none; text-align: center; }

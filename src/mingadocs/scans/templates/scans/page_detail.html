@@ -29,14 +29,17 @@
       <h2>Override</h2>
       <ul class="errorlist" id="err" hidden></ul>
       <p>
-        <label for="arn-body">Set ARN</label>
+        <label for="arn-index">Set ARN</label>
         <span class="arn-fields">
           <input type="text" id="arn-prefix" value="{{ config_prefix }}"
                  size="{{ config_prefix|length }}"
                  readonly tabindex="-1" aria-label="ARN prefix (fixed)">
-          <input type="text" id="arn-body" inputmode="numeric" maxlength="9"
-                 placeholder="9 digits, e.g. 202600042"
-                 value="{{ manual_body }}">
+          <input type="text" id="arn-year" inputmode="numeric" maxlength="4"
+                 value="{{ manual_year }}" aria-label="year">
+          <input type="text" id="arn-volume" inputmode="numeric" maxlength="2"
+                 value="{{ manual_volume }}" placeholder="vol" aria-label="volume">
+          <input type="text" id="arn-index" inputmode="numeric" maxlength="3"
+                 value="{{ manual_index }}" placeholder="idx" aria-label="index">
         </span>
       </p>
       <div class="actions">
@@ -52,7 +55,9 @@
 (function () {
   var url = "{% url 'scans:page-arn' batch.id page.id %}";
   var prefixInput = document.getElementById('arn-prefix');
-  var bodyInput = document.getElementById('arn-body');
+  var yearInput = document.getElementById('arn-year');
+  var volumeInput = document.getElementById('arn-volume');
+  var indexInput = document.getElementById('arn-index');
   var err = document.getElementById('err');
   var eff = document.getElementById('eff');
 
@@ -62,7 +67,9 @@
       var body = new URLSearchParams();
       body.set('mode', b.dataset.mode);
       body.set('arn_prefix', prefixInput.value);
-      body.set('arn_body', bodyInput.value);
+      body.set('arn_year', yearInput.value);
+      body.set('arn_volume', volumeInput.value);
+      body.set('arn_index', indexInput.value);
       fetch(url, {
         method: 'POST',
         headers: {

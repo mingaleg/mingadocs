@@ -1,6 +1,7 @@
 """Views for the scan intake workflow. See docs/scan-workflow.md."""
 from __future__ import annotations
 
+import datetime
 import json
 
 from django.contrib import messages
@@ -175,9 +176,15 @@ def finalize(request, batch_id):
 def page_detail(request, batch_id, page_id):
     page = get_object_or_404(ScanPage, pk=page_id, batch_id=batch_id)
     prefix = PrintSettings.get_solo().arn_prefix
-    manual_body = ""
+    manual_year = str(datetime.date.today().year)
+    manual_volume = ""
+    manual_index = ""
     if page.manual_arn.startswith(prefix):
-        manual_body = page.manual_arn[len(prefix):]
+        body = page.manual_arn[len(prefix):]
+        if len(body) == 9 and body.isdigit():
+            manual_year, manual_volume, manual_index = (
+                body[:4], str(int(body[4:6])), str(int(body[6:9])),
+            )
     eff = page.effective_arn
     effective_label = _arn_labels(list(page.batch.pages.all())).get(page.id) or (
         eff.human_readable() if eff else ""
@@ -186,7 +193,9 @@ def page_detail(request, batch_id, page_id):
         "nav": "scans", "batch": page.batch, "page": page,
         "form": PageArnForm(),
         "config_prefix": prefix,
-        "manual_body": manual_body,
+        "manual_year": manual_year,
+        "manual_volume": manual_volume,
+        "manual_index": manual_index,
         "effective_label": effective_label,
     })
 

@@ -83,9 +83,11 @@ JSON as `arn_label`). Pages with no effective ARN fall back to the OCR note.
 
 `/scans/<id>/pages/<pid>/` shows the full image and lets the user:
 
-- **Set ARN** — the prefix is shown pre-filled and read-only; the user types
-  only the 9-digit body. Posted as `arn_prefix` / `arn_body`; the configured
-  prefix always wins and the combined value is validated by `Arn.parse`.
+- **Set ARN** — four fields: the prefix (pre-filled, read-only), the year
+  (pre-filled with the current year), the volume and the index. Posted as
+  `arn_prefix` / `arn_year` / `arn_volume` / `arn_index`; the configured prefix
+  always wins and the parts are validated by `Arn.volume_start`
+  (year 4 digits, volume 0..99, index 0..999).
 - **Mark as continuation** — the page becomes `PREFIX 000000000`.
 - **Clear override** — fall back to the detected value.
 

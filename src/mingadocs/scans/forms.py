@@ -38,20 +38,33 @@ class PageArnForm(forms.Form):
     mode = forms.ChoiceField(choices=MODE_CHOICES)
     # The prefix is global and permanent; it is shown pre-filled and read-only
     # in the UI, and whatever is posted is ignored in favour of the configured
-    # value. Only the 9-digit body is really entered by hand.
+    # value. The body is entered as its three parts: year (pre-filled with the
+    # current year), volume and index.
     arn_prefix = forms.CharField(required=False)
-    arn_body = forms.CharField(required=False)
+    arn_year = forms.CharField(required=False)
+    arn_volume = forms.CharField(required=False)
+    arn_index = forms.CharField(required=False)
+
+    def _part(self, cleaned, field, label):
+        raw = (cleaned.get(field) or "").strip()
+        try:
+            return int(raw)
+        except ValueError:
+            self.add_error(field, f"{label} must be a number")
+            return None
 
     def clean(self):
         cleaned = super().clean()
         if cleaned.get("mode") == self.MODE_ARN:
             prefix = PrintSettings.get_solo().arn_prefix
-            body = (cleaned.get("arn_body") or "").strip().replace(" ", "")
-            raw = f"{prefix}{body}"
-            try:
-                Arn.parse(raw, prefix)
-            except ValueError as exc:
-                self.add_error("arn_body", str(exc))
-            else:
-                cleaned["arn"] = raw
+            year = self._part(cleaned, "arn_year", "Year")
+            volume = self._part(cleaned, "arn_volume", "Volume")
+            index = self._part(cleaned, "arn_index", "Index")
+            if None not in (year, volume, index):
+                try:
+                    arn = Arn.volume_start(prefix, year, volume, index)
+                except ValueError as exc:
+                    self.add_error("arn_index", str(exc))
+                else:
+                    cleaned["arn"] = arn.barcode_value()
         return cleaned
