@@ -19,18 +19,20 @@ def current_template():
     return TEMPLATES[settings.LABEL_TEMPLATE]
 
 
-def suggest_volume_defaults() -> dict:
-    """Auto-population for the volume-page form (all user-overridable)."""
-    template = current_template()
-    year = date.today().year
-    last = (
+def latest_volume(year: int) -> VolumeAllocation | None:
+    """Most recent volume allocation recorded for ``year`` (or None)."""
+    return (
         VolumeAllocation.objects.filter(year=year).order_by("-volume").first()
     )
-    volume = 0 if last is None else last.volume + 1
+
+
+def suggest_volume_defaults() -> dict:
+    """Auto-population for the volume-page form (all user-overridable)."""
+    year = date.today().year
+    last = latest_volume(year)
     return {
         "year": year,
-        "volume": volume,
-        "max_index": template.labels_per_sheet - 1,
+        "volume": 0 if last is None else last.volume + 1,
     }
 
 
@@ -39,20 +41,19 @@ class Sheet:
     pdf_bytes: bytes
     filename: str
     label_count: int
+    max_index: int
 
 
 def build_sheet(cleaned: dict, prefix: str) -> Sheet:
+    """Build one full sheet. The document index always runs 0..sheet capacity,
+    so ``max_index`` is dictated by the label template, not the user."""
     template = current_template()
+    max_index = template.labels_per_sheet - 1
+
     if cleaned["page_type"] == PAGE_VOLUME:
         year = cleaned["year"]
         volume = cleaned["volume"]
-        max_index = cleaned["max_index"]
         arns = volume_page_arns(prefix, year, volume, max_index)
-        if len(arns) > template.labels_per_sheet:
-            raise ValueError(
-                f"max_index {max_index} needs {len(arns)} labels; sheet holds "
-                f"{template.labels_per_sheet}."
-            )
         filename = f"arn-{year}-{volume:02d}.pdf"
     else:
         arns = continuation_page_arns(prefix, template.labels_per_sheet)
@@ -62,6 +63,7 @@ def build_sheet(cleaned: dict, prefix: str) -> Sheet:
         pdf_bytes=render_sheet(template, arns),
         filename=filename,
         label_count=len(arns),
+        max_index=max_index,
     )
 
 

@@ -39,7 +39,6 @@ class LabelBatchForm(forms.Form):
     )
     year = forms.IntegerField(min_value=1000, max_value=9999, required=False)
     volume = forms.IntegerField(min_value=0, max_value=99, required=False)
-    max_index = forms.IntegerField(min_value=0, max_value=999, required=False)
     # Set by which submit button was pressed (name="output").
     output = forms.ChoiceField(
         choices=OUTPUT_CHOICES, widget=forms.HiddenInput, required=False
@@ -48,7 +47,7 @@ class LabelBatchForm(forms.Form):
     def clean(self):
         cleaned = super().clean()
         if cleaned.get("page_type") == PAGE_VOLUME:
-            for field in ("year", "volume", "max_index"):
+            for field in ("year", "volume"):
                 if cleaned.get(field) is None:
                     self.add_error(field, "Required for a volume page.")
         return cleaned

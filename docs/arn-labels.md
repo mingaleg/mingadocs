@@ -49,16 +49,22 @@ Marks the start of new documents. One sheet contains **every** ARN for a given
 <prefix> <year><volume>NNN     (NNN = max_index)
 ```
 
-Auto-population (all overridable by the user before printing):
+The user enters only **year** and **volume** (a tab picks the page type; there
+is no index field — the index always runs `0` to sheet capacity, `188` for the
+L4731REV, so every volume page fills the whole sheet).
+
+Auto-population (both overridable before printing):
 
 - **year** — current year.
 - **volume** — `1 +` the highest volume previously allocated for that year, or
   `0` if none. Allocations are tracked in `VolumeAllocation`.
-- **max_index** — defaults so the sheet is filled (see [Layout](#label-sheet-layout));
-  e.g. 189 labels ⇒ indices `000`–`188` ⇒ `max_index = 188`.
+
+The form also shows the latest recorded volume for the entered year and when it
+was created (updates as the year field changes).
 
 On a successful print/download of a volume page, an allocation row
-`(year, volume, max_index)` is recorded so the next suggestion advances.
+`(year, volume, max_index)` is recorded (`max_index` = sheet capacity − 1) so
+the next suggestion advances.
 
 ### Continuation page
 

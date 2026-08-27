@@ -193,7 +193,7 @@ form ul label { font-weight: 400; margin-left: 6px; }
   flex-wrap: wrap;
   gap: 16px;
 }
-.field { flex: 1 1 120px; }
+.field { flex: 0 1 180px; }
 .field input { max-width: none; width: 100%; }
 
 .actions {

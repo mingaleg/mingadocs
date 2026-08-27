@@ -98,19 +98,19 @@ class ServiceTests(TestCase):
     def test_suggest_defaults_first_volume(self):
         d = services.suggest_volume_defaults()
         self.assertEqual(d["volume"], 0)
-        self.assertEqual(d["max_index"], 188)
+        self.assertNotIn("max_index", d)
 
     def test_suggest_defaults_increments(self):
         year = services.suggest_volume_defaults()["year"]
         VolumeAllocation.objects.create(year=year, volume=3, max_index=188)
         self.assertEqual(services.suggest_volume_defaults()["volume"], 4)
 
-    def test_build_volume_sheet(self):
+    def test_build_volume_sheet_fills_whole_sheet(self):
         sheet = services.build_sheet(
-            {"page_type": "volume", "year": 2026, "volume": 2, "max_index": 50},
-            "ARN",
+            {"page_type": "volume", "year": 2026, "volume": 2}, "ARN"
         )
-        self.assertEqual(sheet.label_count, 51)
+        self.assertEqual(sheet.label_count, T.labels_per_sheet)
+        self.assertEqual(sheet.max_index, T.labels_per_sheet - 1)
         self.assertEqual(sheet.filename, "arn-2026-02.pdf")
 
     def test_build_continuation_sheet(self):

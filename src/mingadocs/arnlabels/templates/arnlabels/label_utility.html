@@ -27,7 +27,8 @@
 
     <div class="tab-panel" data-panel="volume">
       <p class="helptext">
-        Start of new documents — one label per document, index 0 to max.
+        Start of new documents — one label per document, index 0 to
+        {{ template.labels_per_sheet|add:"-1" }} (the whole sheet).
       </p>
       <div class="field-row">
         <div class="field">
@@ -38,11 +39,8 @@
           {{ form.volume.label_tag }}{{ form.volume }}
           {{ form.volume.errors }}
         </div>
-        <div class="field">
-          {{ form.max_index.label_tag }}{{ form.max_index }}
-          {{ form.max_index.errors }}
-        </div>
       </div>
+      <p class="helptext" id="vol-hint"></p>
     </div>
 
     <div class="tab-panel" data-panel="continuation" hidden>
@@ -51,6 +49,7 @@
         (<code>{{ config.arn_prefix }} 000000000</code>) — fills the whole sheet.
       </p>
     </div>
+    {{ last_by_year|json_script:"last-by-year" }}
 
     <div class="actions">
       {% if default_output == "print" %}
@@ -91,6 +90,24 @@
     t.addEventListener('click', function () { select(t.dataset.page); });
   });
   select(hidden.value || 'volume');
+
+  var lastByYear = JSON.parse(
+    document.getElementById('last-by-year').textContent
+  );
+  var yearInput = document.getElementById('id_year');
+  var hint = document.getElementById('vol-hint');
+  function updateHint() {
+    var y = yearInput.value;
+    var info = lastByYear[y];
+    hint.textContent = info
+      ? 'Latest volume for ' + y + ': ' + info.volume +
+        ' — created ' + info.created
+      : 'No volumes recorded for ' + y + ' yet.';
+  }
+  if (yearInput && hint) {
+    yearInput.addEventListener('input', updateHint);
+    updateHint();
+  }
 })();
 </script>
 {% endblock %}

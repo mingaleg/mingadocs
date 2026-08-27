@@ -56,7 +56,7 @@ def label_utility(request):
 
                 if data["page_type"] == PAGE_VOLUME:
                     services.record_allocation(
-                        data["year"], data["volume"], data["max_index"]
+                        data["year"], data["volume"], sheet.max_index
                     )
 
                 if can_print:
@@ -88,6 +88,13 @@ def label_utility(request):
             }
         )
 
+    last_by_year = {}
+    for a in VolumeAllocation.objects.order_by("year", "volume"):
+        last_by_year[a.year] = {
+            "volume": f"{a.volume:02d}",
+            "created": a.created_at.strftime("%Y-%m-%d %H:%M"),
+        }
+
     return render(
         request,
         "arnlabels/label_utility.html",
@@ -102,6 +109,7 @@ def label_utility(request):
                 if config.print_directly_by_default and config.cups_printer
                 else "pdf"
             ),
+            "last_by_year": last_by_year,
         },
     )
 
