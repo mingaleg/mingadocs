@@ -35,6 +35,10 @@ def list_devices() -> list[str]:
             name = line[8:].split("'", 1)[0]
             if name and name not in devices:
                 devices.append(name)
+    # Order by how likely each backend is to be a working document scanner:
+    # escl/airscan (driverless) first, hpaio next, webcams (v4l) last.
+    rank = {"escl": 0, "airscan": 0, "hpaio": 1}
+    devices.sort(key=lambda n: rank.get(n.split(":", 1)[0], 2))
     return devices
 
 
