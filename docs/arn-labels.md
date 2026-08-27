@@ -33,7 +33,7 @@ Example human-readable values: `ARN 202600042`, `ARN 000000000`.
 ## Page types
 
 The user picks the kind of sheet with a **tab** (Volume / Continuation); the
-two submit buttons are **Send to printer** and **Download PDF**. Whichever
+two submit buttons are **Send to printer** and **Render PDF**. Whichever
 matches `print_directly_by_default` (and a configured printer) is shown first
 and accent-styled; "Send to printer" is disabled when no printer is set.
 
@@ -113,7 +113,7 @@ so it only lands on the labels if the printer uses the **same** page size.
 - CUPS jobs are submitted with `media=A4`, `fit-to-page=false`, `scaling=100`
   (`printing.submit_pdf`). A queue whose default is Letter would otherwise clip
   ~17.6 mm off the bottom — i.e. the entire last label row.
-- For the **Download PDF** path, print it with "Actual size" / 100 %, media A4,
+- For the **Render PDF** path, print it with "Actual size" / 100 %, media A4,
   never "Fit to printable area".
 
 ### Calibration
@@ -151,9 +151,11 @@ Editable on `/labels/settings/` and in the Django admin.
 - The server generates the PDF with `reportlab`.
 - **Default:** submit the PDF straight to the configured CUPS queue via
   `pycups` (`arnlabels/printing.py`). No client-side print dialog.
-- **Always available:** a "Download PDF" option that returns the same PDF as an
-  `application/pdf` response instead of printing.
-- If no `cups_printer` is configured, only download is offered.
+- **Always available:** a "Render PDF" option that returns the same PDF as an
+  `application/pdf` response with `Content-Disposition: inline` — it opens in
+  the browser's PDF viewer; the `arn-<year>-<vol>.pdf` filename is kept for when
+  the user saves it.
+- If no `cups_printer` is configured, only "Render PDF" is offered.
 - The settings page lists available CUPS queues (`printing.list_printers()`)
   to choose from.
 

@@ -92,6 +92,8 @@ class ViewTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r["Content-Type"], "application/pdf")
         self.assertTrue(r.content.startswith(b"%PDF"))
+        self.assertIn("inline", r["Content-Disposition"])
+        self.assertIn("arn-continuation.pdf", r["Content-Disposition"])
 
 
 class ServiceTests(TestCase):

@@ -30,7 +30,7 @@ class LabelBatchForm(forms.Form):
     ]
     OUTPUT_CHOICES = [
         ("print", "Send to printer"),
-        ("pdf", "Download PDF"),
+        ("pdf", "Render PDF"),
     ]
 
     # Driven by the tab strip in the template.

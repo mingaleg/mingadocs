@@ -76,8 +76,10 @@ def label_utility(request):
                 response = HttpResponse(
                     sheet.pdf_bytes, content_type="application/pdf"
                 )
+                # inline: show it in the browser's PDF viewer; the filename is
+                # still used if the user then saves it.
                 response["Content-Disposition"] = (
-                    f'attachment; filename="{sheet.filename}"'
+                    f'inline; filename="{sheet.filename}"'
                 )
                 return response
     else:
