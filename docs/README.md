@@ -37,6 +37,7 @@ src/mingadocs/
   config/            Django project (settings, urls, wsgi/asgi)
   arnlabels/         ARN label printing app
   scans/             Scan intake workflow app
+  siteconfig/        The unified /settings/ page (no models)
 media/               Uploaded scan images + generated document PDFs (gitignored)
 docs/                Requirements and context (this directory)
 ```
@@ -55,8 +56,10 @@ poetry run python src/mingadocs/manage.py runserver
 - Label utility:   `/labels/`
 - Scan intake:     `/scans/`
 - Documents:       `/scans/documents/`
-- Settings:         `/scans/settings/` — unified page, `#labels` + `#scanner`
-  sections (also in Django admin). `/labels/settings/` redirects here.
+- Settings:         `/settings/` — unified page (`siteconfig` app), `#labels` +
+  `#scanner` sections (also in Django admin). `/scans/settings/` and
+  `/labels/settings/` redirect here. Printer / scanner lists are probed once
+  per process and cached; "Rescan hardware" forces a refresh.
 
 Without a scanner, set `MINGADOCS_FAKE_SCANNER=/path/to/image.png` and every
 "Scan Page" returns that image.

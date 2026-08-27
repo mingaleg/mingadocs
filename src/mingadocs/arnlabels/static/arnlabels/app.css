@@ -283,6 +283,7 @@ table.data th, table.data td {
 }
 table.data th { color: var(--muted); font-weight: 600; font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; }
 .empty { color: var(--muted); font-style: italic; }
+.hint { color: var(--muted); font-size: .85rem; margin: 12px 0 0; }
 
 .pill {
   display: inline-block;

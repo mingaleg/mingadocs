@@ -1,4 +1,5 @@
 from django.urls import path
+from django.views.generic import RedirectView
 
 from . import views
 
@@ -8,7 +9,8 @@ urlpatterns = [
     path("", views.batch_list, name="batch-list"),
     path("new/", views.new_batch, name="new-batch"),
     path("documents/", views.document_list, name="document-list"),
-    path("settings/", views.settings_page, name="settings"),
+    # Settings moved to their own module at /settings/; keep old links working.
+    path("settings/", RedirectView.as_view(url="/settings/", query_string=True)),
     path("<int:batch_id>/", views.batch_console, name="console"),
     path("<int:batch_id>/review/", views.batch_review, name="review"),
     path("<int:batch_id>/status/", views.batch_status, name="status"),

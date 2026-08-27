@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'solo',
     'arnlabels',
     'scans',
+    'siteconfig',
 ]
 
 MIDDLEWARE = [

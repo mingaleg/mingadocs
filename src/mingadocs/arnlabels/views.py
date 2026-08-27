@@ -119,4 +119,4 @@ def label_utility(request):
 
 def print_settings(request):
     """Old URL — label settings now live on the unified settings page."""
-    return redirect(reverse("scans:settings") + "#labels")
+    return redirect(reverse("siteconfig:settings") + "#labels")

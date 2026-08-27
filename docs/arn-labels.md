@@ -140,8 +140,8 @@ larger label stock.
 
 Global and permanent, stored as a single `PrintSettings` row (django-solo).
 Editable in the **Label printing** section of the unified settings page
-(`/scans/settings/#labels`; `/labels/settings/` redirects there) and in the
-Django admin.
+(`/settings/#labels`, served by the `siteconfig` app; `/labels/settings/`
+redirects there) and in the Django admin.
 
 | Field                       | Default | Purpose |
 |-----------------------------|---------|---------|

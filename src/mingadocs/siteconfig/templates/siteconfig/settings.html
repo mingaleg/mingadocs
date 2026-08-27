@@ -23,7 +23,9 @@
 </section>
 
 <section id="scanner" class="card">
-  <h2>Scanner</h2>
+  <h2>Scanner
+    <button type="submit" form="rescan-hw" class="btn secondary small">Rescan hardware</button>
+  </h2>
   {% if not devices %}
     <ul class="messages"><li class="warning">
       No SANE devices detected (<code>scanimage -L</code> returned nothing —
@@ -38,5 +40,14 @@
     {{ scan_form.as_p }}
     <div class="actions"><button type="submit">Save scanner settings</button></div>
   </form>
+  <p class="hint">
+    The printer and scanner lists are probed once and cached — hit
+    <em>Rescan hardware</em> after plugging something in.
+  </p>
 </section>
+
+<form method="post" id="rescan-hw" hidden>
+  {% csrf_token %}
+  <input type="hidden" name="section" value="rescan">
+</form>
 {% endblock %}

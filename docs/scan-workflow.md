@@ -151,9 +151,15 @@ pages and no alerts.
 ## Settings
 
 `ScanSettings` singleton — edited in the **Scanner** section of the unified
-settings page (`/scans/settings/#scanner`, linked as "Settings" in the nav;
-`/labels/settings/` redirects to the **Label printing** section). Also in the
-Django admin.
+settings page, which lives in its own tiny app: `siteconfig` serves
+`/settings/` (`#scanner` / `#labels` sections). It has no models of its own —
+it just edits `arnlabels.PrintSettings` and `scans.ScanSettings`. Old links
+(`/scans/settings/`, `/labels/settings/`) redirect there. Also in the Django
+admin.
+
+The CUPS printer list and the SANE device list are slow external probes, so
+`siteconfig.probe` runs each **once per process** and caches the result (1 h
+safety TTL); the **Rescan hardware** button on the page forces a refresh.
 
 | Field                 | Default | Purpose |
 |-----------------------|---------|---------|
@@ -173,9 +179,10 @@ The ARN **prefix** is shared with label printing (`arnlabels.PrintSettings`).
 | `scans/ocr.py`       | Code 128 → ARN detection (`zxing-cpp`) |
 | `scans/jobs.py`      | Background scan/OCR workers, restart recovery |
 | `scans/services.py`  | Batch lifecycle, alerts, finalization |
-| `scans/views.py`     | Console, review, page detail, document list, settings, JSON endpoints |
+| `scans/views.py`     | Console, review, page detail, document list, JSON endpoints |
 | `scans/forms.py`     | `ScanSettingsForm`, `PageArnForm` |
-| `scans/templates/scans/` | 6 templates, extend `arnlabels/base.html` |
+| `scans/templates/scans/` | 5 templates, extend `arnlabels/base.html` |
+| `siteconfig/`        | The `/settings/` page (view + `probe.py` hardware cache); no models |
 
 Shared CSS lives in `arnlabels/static/arnlabels/app.css` (`.thumb-grid`,
 `.modal`, `.alert-list`, …).

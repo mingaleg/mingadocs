@@ -117,7 +117,7 @@ class ViewTests(TestCase):
 
     def test_label_settings_url_redirects_to_unified_page(self):
         r = self.client.get("/labels/settings/")
-        self.assertRedirects(r, "/scans/settings/#labels",
+        self.assertRedirects(r, "/settings/#labels",
                              fetch_redirect_response=False)
 
     def test_download_pdf(self):

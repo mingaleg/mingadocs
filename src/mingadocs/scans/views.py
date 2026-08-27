@@ -11,11 +11,11 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from . import scanner, services
-from .forms import PageArnForm, ScanSettingsForm
+from . import services
+from .forms import PageArnForm
 from arnlabels.models import PrintSettings
 
-from .models import Document, ScanBatch, ScanPage, ScanSettings
+from .models import Document, ScanBatch, ScanPage
 
 
 def _page_json(page: ScanPage, arn_label: str | None = None) -> dict:
@@ -246,49 +246,3 @@ def page_remove(request, batch_id, page_id):
     page = get_object_or_404(ScanPage, pk=page_id, batch_id=batch_id)
     services.remove_page(page)
     return JsonResponse({"ok": True})
-
-
-def settings_page(request):
-    """Unified settings page: label printing + scanner, one section each."""
-    from arnlabels.forms import PrintSettingsForm
-    from arnlabels.printing import list_printers
-
-    print_config = PrintSettings.get_solo()
-    scan_config = ScanSettings.get_solo()
-
-    try:
-        printers = sorted(list_printers())
-    except Exception:  # noqa: BLE001 - CUPS unreachable
-        printers = []
-    try:
-        devices = scanner.list_devices()
-    except Exception:  # noqa: BLE001
-        devices = []
-
-    section = request.POST.get("section") if request.method == "POST" else None
-
-    if section == "labels":
-        print_form = PrintSettingsForm(request.POST, instance=print_config,
-                                       printers=printers)
-        scan_form = ScanSettingsForm(instance=scan_config, devices=devices)
-        if print_form.is_valid():
-            print_form.save()
-            messages.success(request, "Label settings saved.")
-            return redirect(reverse("scans:settings") + "#labels")
-    elif section == "scanner":
-        scan_form = ScanSettingsForm(request.POST, instance=scan_config,
-                                     devices=devices)
-        print_form = PrintSettingsForm(instance=print_config, printers=printers)
-        if scan_form.is_valid():
-            scan_form.save()
-            messages.success(request, "Scanner settings saved.")
-            return redirect(reverse("scans:settings") + "#scanner")
-    else:
-        print_form = PrintSettingsForm(instance=print_config, printers=printers)
-        scan_form = ScanSettingsForm(instance=scan_config, devices=devices)
-
-    return render(request, "scans/settings.html", {
-        "nav": "settings",
-        "print_form": print_form, "printers": printers,
-        "scan_form": scan_form, "devices": devices,
-    })
