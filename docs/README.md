@@ -10,9 +10,13 @@ their archive location by OCR.
 
 ## Status
 
-Early development. The first deliverable is the **ARN label printing utility**
-(see [`arn-labels.md`](arn-labels.md)). Everything else (document intake,
-storage, OCR pipeline, retention) is future work.
+Early development. Implemented:
+
+- **ARN label printing utility** — see [`arn-labels.md`](arn-labels.md).
+- **Scan workflow** — scan labelled paper, detect the ARN barcode, group pages
+  into document PDFs. See [`scan-workflow.md`](scan-workflow.md).
+
+Future work: storage/retention, electronic-document intake, search, auth.
 
 ## Tech stack
 
@@ -22,6 +26,8 @@ storage, OCR pipeline, retention) is future work.
 - `reportlab` for PDF generation
 - `pycups` for sending print jobs to CUPS
 - `django-solo` for singleton (global, permanent) settings
+- `Pillow` + `zxing-cpp` for reading ARN barcodes off scans
+- SANE's `scanimage` CLI (system package `sane-utils`) to drive the scanner
 
 ## Layout
 
@@ -30,6 +36,8 @@ src/mingadocs/
   manage.py
   config/            Django project (settings, urls, wsgi/asgi)
   arnlabels/         ARN label printing app
+  scans/             Scan intake workflow app
+media/               Uploaded scan images + generated document PDFs (gitignored)
 docs/                Requirements and context (this directory)
 ```
 
@@ -44,6 +52,11 @@ poetry run python src/mingadocs/manage.py runserver
 - Overview:        `/`
 - Label utility:   `/labels/`
 - Print settings:  `/labels/settings/` (also in Django admin)
+- Scan intake:     `/scans/`
+- Scan settings:   `/scans/settings/`
+
+Without a scanner, set `MINGADOCS_FAKE_SCANNER=/path/to/image.png` and every
+"Scan Page" returns that image.
 
 Templates extend `arnlabels/base.html`; styling is one stylesheet at
 `arnlabels/static/arnlabels/app.css` (light/dark aware, no build step).

@@ -1,0 +1,115 @@
+{% extends "arnlabels/base.html" %}
+{% block title %}Batch #{{ batch.id }} · Review{% endblock %}
+{% block content %}
+<form hidden>{% csrf_token %}</form>
+
+<h1>Batch #{{ batch.id }} — review</h1>
+<p class="lede">
+  Fix any highlighted pages, drag to reorder, remove rejects. Finalize when all
+  alerts are cleared.
+</p>
+
+<ul class="alert-list" id="alerts"></ul>
+
+<div class="actions">
+  <button type="button" id="finalize-btn">Finalize batch</button>
+  <a class="btn secondary" href="{% url 'scans:batch-list' %}">Back to list</a>
+</div>
+
+<div class="thumb-grid" id="pages"></div>
+
+<script id="initial" type="application/json">{{ initial|safe }}</script>
+<script>
+(function () {
+  var statusUrl = "{% url 'scans:status' batch.id %}";
+  var reorderUrl = "{% url 'scans:reorder' batch.id %}";
+  var finalizeUrl = "{% url 'scans:finalize' batch.id %}";
+  var removeBase = "{% url 'scans:review' batch.id %}"; // replaced below
+  var grid = document.getElementById('pages');
+  var alertBox = document.getElementById('alerts');
+  var finalizeBtn = document.getElementById('finalize-btn');
+  var order = [];
+
+  function render(state) {
+    if (state.status === 'finalized') { location.href = "{% url 'scans:batch-list' %}"; return; }
+    order = state.pages.map(function (p) { return p.id; });
+    grid.innerHTML = '';
+    state.pages.forEach(function (p) {
+      var cell = document.createElement('div');
+      cell.className = 'thumb' + (p.needs_attention ? ' attention' : '');
+      cell.draggable = true;
+      cell.dataset.id = p.id;
+      cell.innerHTML =
+        '<button type="button" class="remove" title="Remove">✕</button>' +
+        (p.thumb_url ? '<img src="' + p.thumb_url + '" alt="page ' + p.position + '">' : '') +
+        '<div class="thumb-meta"><span class="thumb-arn">' +
+        (p.arn || '— ' + (p.ocr_note || 'no ARN') + ' —') + '</span>' +
+        ' <a href="' + p.detail_url + '">edit</a></div>';
+      cell.querySelector('.remove').addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (!confirm('Remove page ' + p.position + '?')) { return; }
+        window.postJSON(p.detail_url + 'remove/').then(poll);
+      });
+      addDnd(cell);
+      grid.appendChild(cell);
+    });
+
+    alertBox.innerHTML = '';
+    if (!state.alerts.length) {
+      alertBox.innerHTML = '<li class="ok">No alerts — ready to finalize.</li>';
+    }
+    state.alerts.forEach(function (a) {
+      var li = document.createElement('li');
+      li.className = a.level === 'warn' ? 'warn' : '';
+      li.textContent = a.message;
+      alertBox.appendChild(li);
+    });
+    finalizeBtn.disabled = !state.finalizable;
+  }
+
+  var dragId = null;
+  function addDnd(cell) {
+    cell.addEventListener('dragstart', function () {
+      dragId = cell.dataset.id; cell.classList.add('dragging');
+    });
+    cell.addEventListener('dragend', function () {
+      cell.classList.remove('dragging');
+      grid.querySelectorAll('.drop-target').forEach(function (c) {
+        c.classList.remove('drop-target');
+      });
+    });
+    cell.addEventListener('dragover', function (e) {
+      e.preventDefault(); cell.classList.add('drop-target');
+    });
+    cell.addEventListener('dragleave', function () {
+      cell.classList.remove('drop-target');
+    });
+    cell.addEventListener('drop', function (e) {
+      e.preventDefault();
+      cell.classList.remove('drop-target');
+      var from = order.indexOf(parseInt(dragId, 10));
+      var to = order.indexOf(parseInt(cell.dataset.id, 10));
+      if (from < 0 || to < 0 || from === to) { return; }
+      order.splice(to, 0, order.splice(from, 1)[0]);
+      window.postJSON(reorderUrl, { ids: order }).then(poll);
+    });
+  }
+
+  function poll() {
+    fetch(statusUrl).then(function (r) { return r.json(); })
+      .then(render).catch(function () {});
+  }
+  render(JSON.parse(document.getElementById('initial').textContent));
+  setInterval(poll, 2500);
+
+  finalizeBtn.addEventListener('click', function () {
+    finalizeBtn.disabled = true;
+    window.postJSON(finalizeUrl).then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.redirect) { location.href = d.redirect; }
+        else { poll(); }
+      });
+  });
+})();
+</script>
+{% endblock %}

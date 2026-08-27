@@ -17,6 +17,8 @@
            class="{% if nav == 'index' %}active{% endif %}">Overview</a>
         <a href="{% url 'arnlabels:label-utility' %}"
            class="{% if nav == 'labels' %}active{% endif %}">Print labels</a>
+        <a href="{% url 'scans:batch-list' %}"
+           class="{% if nav == 'scans' %}active{% endif %}">Scan</a>
         <a href="{% url 'arnlabels:print-settings' %}"
            class="{% if nav == 'settings' %}active{% endif %}">Settings</a>
       </nav>
@@ -33,6 +35,27 @@
     {% endif %}
     {% block content %}{% endblock %}
   </main>
+
+  <script>
+  // Shared helper: CSRF token for fetch() POSTs.
+  window.csrftoken = (function () {
+    var el = document.querySelector('input[name=csrfmiddlewaretoken]');
+    if (el) { return el.value; }
+    var m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+  })();
+  window.postJSON = function (url, body) {
+    return fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': window.csrftoken,
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: body ? JSON.stringify(body) : null,
+    });
+  };
+  </script>
 
   <script>
   // Bespoke -/+ stepper controls for every number input.

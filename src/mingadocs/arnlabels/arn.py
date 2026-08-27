@@ -40,6 +40,21 @@ class Arn:
     def continuation(cls, prefix: str) -> "Arn":
         return cls(prefix, CONTINUATION_BODY)
 
+    @classmethod
+    def parse(cls, value: str, prefix: str) -> "Arn":
+        """Parse a raw barcode string (``prefix`` + 9 digits, no space).
+
+        Raises ``ValueError`` if it does not start with ``prefix`` or the
+        remainder is not exactly 9 digits.
+        """
+        value = value.strip()
+        if not prefix or not value.startswith(prefix):
+            raise ValueError(f"{value!r} does not start with prefix {prefix!r}")
+        body = value[len(prefix):]
+        if len(body) != 9 or not body.isdigit():
+            raise ValueError(f"ARN body must be 9 digits, got {body!r}")
+        return cls(prefix, body)
+
     @property
     def is_continuation(self) -> bool:
         return self.body == CONTINUATION_BODY

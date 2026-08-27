@@ -1,0 +1,56 @@
+{% extends "arnlabels/base.html" %}
+{% block title %}Scan · mingadocs{% endblock %}
+{% block content %}
+<h1>Scan intake</h1>
+<p class="lede">
+  Scan labelled paper, detect each ARN barcode, group pages into documents.
+  <a href="{% url 'scans:settings' %}">Scanner settings</a>
+</p>
+
+<form method="post" action="{% url 'scans:new-batch' %}" class="actions">
+  {% csrf_token %}
+  <button type="submit">Start new batch</button>
+</form>
+
+<div class="card">
+  <h2>In-flight batches</h2>
+  {% if active %}
+    <table class="data">
+      <thead><tr><th>Batch</th><th>Status</th><th>Started</th><th>Pages</th></tr></thead>
+      <tbody>
+      {% for b in active %}
+        <tr>
+          <td><a href="{% if b.status == 'scanning' %}{% url 'scans:console' b.id %}{% else %}{% url 'scans:review' b.id %}{% endif %}">#{{ b.id }}</a></td>
+          <td><span class="pill {% if b.status == 'review' %}off{% endif %}">{{ b.get_status_display }}</span></td>
+          <td>{{ b.created_at|date:"Y-m-d H:i" }}</td>
+          <td>{{ b.pages.count }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">No batches in progress.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Recent documents</h2>
+  {% if documents %}
+    <table class="data">
+      <thead><tr><th>ARN</th><th>Pages</th><th>Created</th><th>PDF</th></tr></thead>
+      <tbody>
+      {% for d in documents %}
+        <tr>
+          <td>{{ d.start_arn }}</td>
+          <td>{{ d.page_count }}</td>
+          <td>{{ d.created_at|date:"Y-m-d H:i" }}</td>
+          <td>{% if d.pdf %}<a href="{{ d.pdf.url }}" target="_blank">open</a>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">No documents yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,86 @@
+{% extends "arnlabels/base.html" %}
+{% block title %}Batch #{{ batch.id }} · Page {{ page.position }}{% endblock %}
+{% block content %}
+<form hidden>{% csrf_token %}</form>
+
+<p class="lede"><a href="{% url 'scans:review' batch.id %}">← Batch #{{ batch.id }} review</a></p>
+<h1>Page {{ page.position }}</h1>
+
+<div class="grid-2">
+  <div>
+    {% if page.image %}
+      <img class="page-preview" src="{{ page.image.url }}" alt="page {{ page.position }}">
+    {% else %}
+      <p class="empty">No image ({{ page.scan_status }}).</p>
+    {% endif %}
+  </div>
+  <div>
+    <div class="card">
+      <h2>Detected ARN</h2>
+      <dl class="facts">
+        <dt>Scan</dt><dd>{{ page.scan_status }}</dd>
+        <dt>OCR</dt><dd>{{ page.ocr_status }}{% if page.ocr_note %} — {{ page.ocr_note }}{% endif %}</dd>
+        <dt>Barcode</dt><dd>{{ page.detected_arn|default:"—" }}</dd>
+        <dt>Effective</dt>
+        <dd id="eff">{% if page.effective_arn %}{{ page.effective_arn.human_readable }}{% else %}<span class="pill err">needs attention</span>{% endif %}</dd>
+      </dl>
+    </div>
+    <div class="card">
+      <h2>Override</h2>
+      <ul class="errorlist" id="err" hidden></ul>
+      <p>
+        <label for="arn-input">Set ARN</label>
+        <input type="text" id="arn-input"
+               placeholder="{{ config_prefix }} + 9 digits, e.g. {{ config_prefix }}202600042"
+               value="{{ page.manual_arn }}">
+      </p>
+      <div class="actions">
+        <button type="button" data-mode="arn">Save ARN</button>
+        <button type="button" class="btn secondary" data-mode="continuation">Mark continuation</button>
+        <button type="button" class="btn secondary" data-mode="clear">Clear override</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var url = "{% url 'scans:page-arn' batch.id page.id %}";
+  var input = document.getElementById('arn-input');
+  var err = document.getElementById('err');
+  var eff = document.getElementById('eff');
+
+  document.querySelectorAll('[data-mode]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      err.hidden = true; err.innerHTML = '';
+      var body = new URLSearchParams();
+      body.set('mode', b.dataset.mode);
+      body.set('arn', input.value);
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': window.csrftoken,
+          'X-Requested-With': 'XMLHttpRequest',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: body.toString(),
+      }).then(function (r) { return r.json().then(function (d) { return [r.status, d]; }); })
+        .then(function (pair) {
+          var status = pair[0], d = pair[1];
+          if (status >= 400) {
+            err.hidden = false;
+            Object.keys(d.errors || {}).forEach(function (k) {
+              (d.errors[k] || []).forEach(function (m) {
+                var li = document.createElement('li'); li.textContent = m;
+                err.appendChild(li);
+              });
+            });
+            return;
+          }
+          eff.textContent = d.page.arn || 'needs attention';
+        });
+    });
+  });
+})();
+</script>
+{% endblock %}

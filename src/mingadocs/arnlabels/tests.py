@@ -36,6 +36,26 @@ class ArnTests(TestCase):
             Arn.volume_start("ARN", 2026, 0, 1000)
 
 
+class ArnParseTests(TestCase):
+    def test_parse_ok(self):
+        a = Arn.parse("ARN202600042", "ARN")
+        self.assertEqual(a.body, "202600042")
+        self.assertFalse(a.is_continuation)
+
+    def test_parse_strips_whitespace(self):
+        self.assertEqual(Arn.parse("  ARN000000000\n", "ARN").body, "000000000")
+
+    def test_parse_wrong_prefix(self):
+        with self.assertRaises(ValueError):
+            Arn.parse("XYZ202600042", "ARN")
+
+    def test_parse_bad_body(self):
+        with self.assertRaises(ValueError):
+            Arn.parse("ARN20260004", "ARN")
+        with self.assertRaises(ValueError):
+            Arn.parse("ARN20260004X", "ARN")
+
+
 class TemplateGeometryTests(TestCase):
     def test_capacity(self):
         self.assertEqual(T.labels_per_sheet, 189)

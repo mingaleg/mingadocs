@@ -286,3 +286,60 @@ table.data th { color: var(--muted); font-weight: 600; font-size: .85rem; text-t
   background: var(--ok-bg); color: var(--ok-ink);
 }
 .pill.off { background: var(--warn-bg); color: var(--warn-ink); }
+.pill.err { background: var(--err-bg); color: var(--err-ink); }
+.pill.muted { background: var(--border); color: var(--muted); }
+
+/* --- Scan workflow --------------------------------------------------------- */
+
+.thumb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 14px;
+  margin: 18px 0;
+}
+.thumb {
+  position: relative;
+  display: block;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+  text-decoration: none;
+  color: var(--text);
+}
+.thumb img { display: block; width: 100%; height: 150px; object-fit: cover; }
+.thumb .thumb-meta { padding: 6px 8px; font-size: .8rem; }
+.thumb .thumb-arn { font-variant-numeric: tabular-nums; }
+.thumb.attention { border-color: var(--err-ink); }
+.thumb.placeholder { display: flex; align-items: center; justify-content: center;
+  height: 190px; color: var(--muted); font-size: .85rem; }
+.thumb.dragging { opacity: .4; }
+.thumb.drop-target { border-color: var(--accent); }
+.thumb .remove {
+  position: absolute; top: 4px; right: 4px;
+  width: 24px; height: 24px; padding: 0; line-height: 1;
+  border-radius: 6px; font-size: .9rem;
+}
+
+.alert-list { list-style: none; padding: 0; margin: 0 0 18px; }
+.alert-list li {
+  padding: 9px 13px; border-radius: 8px; margin-bottom: 8px;
+  background: var(--err-bg); color: var(--err-ink); font-size: .9rem;
+}
+.alert-list li.warn { background: var(--warn-bg); color: var(--warn-ink); }
+.alert-list li.ok { background: var(--ok-bg); color: var(--ok-ink); }
+
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(8, 15, 22, .55);
+  display: flex; align-items: center; justify-content: center; z-index: 50;
+}
+.modal-backdrop[hidden] { display: none; }
+.modal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 22px; max-width: 420px; width: calc(100% - 40px);
+}
+.modal h2 { margin-bottom: 8px; }
+
+.page-preview { max-width: 100%; border: 1px solid var(--border);
+  border-radius: 8px; }

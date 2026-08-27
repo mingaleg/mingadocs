@@ -1,0 +1,23 @@
+{% extends "arnlabels/base.html" %}
+{% block title %}Scan settings · mingadocs{% endblock %}
+{% block content %}
+<h1>Scanner settings</h1>
+<p class="lede">Global and permanent. The server drives the scanner via SANE's
+  <code>scanimage</code>.</p>
+
+{% if not devices %}
+  <ul class="messages"><li class="warning">
+    No SANE devices detected (<code>scanimage -L</code> returned nothing). You
+    can still type a device name, or set <code>MINGADOCS_FAKE_SCANNER</code> for
+    testing without hardware.
+  </li></ul>
+{% endif %}
+
+<div class="card">
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <div class="actions"><button type="submit">Save</button></div>
+  </form>
+</div>
+{% endblock %}

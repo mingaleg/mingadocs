@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'solo',
     'arnlabels',
+    'scans',
 ]
 
 MIDDLEWARE = [
@@ -73,6 +74,12 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Label printing defaults (see docs/). Runtime-configurable values live in the
 # arnlabels.PrintSettings singleton, not here.
 LABEL_TEMPLATE = 'AVERY_L4731REV'  # Avery Zweckform L4731REV-25
+
+
+# Uploaded / generated files: scanned page images and finalized document PDFs.
+# See docs/scan-workflow.md.
+MEDIA_URL = 'media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 
 # Database

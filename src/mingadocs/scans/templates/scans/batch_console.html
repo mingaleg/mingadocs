@@ -1,0 +1,97 @@
+{% extends "arnlabels/base.html" %}
+{% block title %}Batch #{{ batch.id }} · Scanning{% endblock %}
+{% block content %}
+<form hidden>{% csrf_token %}</form>
+
+<h1>Batch #{{ batch.id }} — scanning</h1>
+<p class="lede">
+  Feed a page, press <strong>Scan Page</strong>. The button re-enables when the
+  scan finishes (barcode detection may still be running). Stop when done.
+</p>
+
+<div class="actions">
+  <button type="button" id="scan-btn">Scan Page</button>
+  <button type="button" id="stop-btn" class="btn secondary">Stop</button>
+</div>
+<p class="helptext" id="scan-msg"></p>
+
+<div class="thumb-grid" id="pages"></div>
+
+<div class="modal-backdrop" id="stop-modal" hidden>
+  <div class="modal">
+    <h2>Stop this batch?</h2>
+    <p>The batch moves to review. You can still edit ARNs, reorder and remove
+       pages, but no more scanning.</p>
+    <div class="actions">
+      <button type="button" id="stop-confirm">Stop batch</button>
+      <button type="button" id="stop-cancel" class="btn secondary">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var statusUrl = "{% url 'scans:status' batch.id %}";
+  var scanUrl = "{% url 'scans:scan' batch.id %}";
+  var stopUrl = "{% url 'scans:stop' batch.id %}";
+  var btn = document.getElementById('scan-btn');
+  var stopBtn = document.getElementById('stop-btn');
+  var msg = document.getElementById('scan-msg');
+  var grid = document.getElementById('pages');
+  var modal = document.getElementById('stop-modal');
+
+  function render(state) {
+    if (state.status !== 'scanning') { location.reload(); return; }
+    btn.disabled = state.scan_in_progress;
+    msg.textContent = state.scan_in_progress ? 'Scanning…' : '';
+    grid.innerHTML = '';
+    state.pages.forEach(function (p) {
+      var cell = document.createElement(p.thumb_url ? 'a' : 'div');
+      cell.className = 'thumb' + (p.needs_attention && p.scan_status === 'done' ? ' attention' : '');
+      if (p.thumb_url) { cell.href = p.detail_url; }
+      if (p.scan_status === 'pending') {
+        cell.className = 'thumb placeholder';
+        cell.textContent = 'scanning…';
+      } else if (p.scan_status === 'failed') {
+        cell.className = 'thumb placeholder';
+        cell.textContent = 'scan failed: ' + p.ocr_note;
+      } else {
+        cell.innerHTML =
+          '<img src="' + p.thumb_url + '" alt="page ' + p.position + '">' +
+          '<div class="thumb-meta"><span class="thumb-arn">' +
+          (p.arn || ocrLabel(p)) + '</span></div>';
+      }
+      grid.appendChild(cell);
+    });
+  }
+  function ocrLabel(p) {
+    if (p.ocr_status === 'pending' || p.ocr_status === 'running') return 'reading…';
+    return '— ' + (p.ocr_note || 'no ARN') + ' —';
+  }
+
+  function poll() {
+    fetch(statusUrl).then(function (r) { return r.json(); })
+      .then(render).catch(function () {});
+  }
+  setInterval(poll, 1500);
+  poll();
+
+  btn.addEventListener('click', function () {
+    btn.disabled = true;
+    window.postJSON(scanUrl).then(function (r) {
+      if (r.status === 409) { r.json().then(function (d) { msg.textContent = d.error; }); }
+      poll();
+    });
+  });
+
+  stopBtn.addEventListener('click', function () { modal.hidden = false; });
+  document.getElementById('stop-cancel').addEventListener('click', function () {
+    modal.hidden = true;
+  });
+  document.getElementById('stop-confirm').addEventListener('click', function () {
+    window.postJSON(stopUrl).then(function (r) { return r.json(); })
+      .then(function (d) { location.href = d.redirect; });
+  });
+})();
+</script>
+{% endblock %}
