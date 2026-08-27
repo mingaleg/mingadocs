@@ -152,6 +152,14 @@ form select {
   color: var(--text);
   font: inherit;
 }
+/* Drop the native number spinners - they clash with the field styling. */
+form input[type=number] { appearance: textfield; -moz-appearance: textfield; }
+form input[type=number]::-webkit-outer-spin-button,
+form input[type=number]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 form ul { list-style: none; padding: 0; margin: 4px 0; }
 form ul li { margin: 2px 0; }
 form ul label { font-weight: 400; margin-left: 6px; }
