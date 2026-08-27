@@ -81,7 +81,9 @@ JSON as `arn_label`). Pages with no effective ARN fall back to the OCR note.
 
 ## Manual override
 
-`/scans/<id>/pages/<pid>/` shows the full image and lets the user:
+`/scans/<id>/pages/<pid>/` shows the scan image (click it for a full-width
+overlay preview; close with the ✕, a click outside the image, or Esc) and lets
+the user:
 
 - **Set ARN** — four fields: the prefix (pre-filled, read-only), the year
   (pre-filled with the current year), the volume and the index. The volume is

@@ -9,7 +9,8 @@
 <div class="grid-2">
   <div>
     {% if page.image %}
-      <img class="page-preview" src="{{ page.image.url }}" alt="page {{ page.position }}">
+      <img class="page-preview" id="page-img" src="{{ page.image.url }}"
+           alt="page {{ page.position }}" title="Click to enlarge">
     {% else %}
       <p class="empty">No image ({{ page.scan_status }}).</p>
     {% endif %}
@@ -50,6 +51,16 @@
     </div>
   </div>
 </div>
+
+{% if page.image %}
+<div class="lightbox" id="lightbox" hidden>
+  <button type="button" class="lightbox-close" id="lightbox-close"
+          aria-label="Close preview">✕</button>
+  <div class="lightbox-scroll">
+    <img src="{{ page.image.url }}" alt="page {{ page.position }} — full size">
+  </div>
+</div>
+{% endif %}
 
 <script>
 (function () {
@@ -135,6 +146,30 @@
         });
     });
   });
+
+  // Full-size page preview.
+  var img = document.getElementById('page-img');
+  var lightbox = document.getElementById('lightbox');
+  if (img && lightbox) {
+    var closeBtn = document.getElementById('lightbox-close');
+    function open() {
+      lightbox.hidden = false;
+      document.body.style.overflow = 'hidden';
+      closeBtn.focus();
+    }
+    function close() {
+      lightbox.hidden = true;
+      document.body.style.overflow = '';
+    }
+    img.addEventListener('click', open);
+    closeBtn.addEventListener('click', close);
+    lightbox.addEventListener('click', function (e) {
+      if (e.target !== closeBtn) { close(); }
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !lightbox.hidden) { close(); }
+    });
+  }
 })();
 </script>
 {% endblock %}
