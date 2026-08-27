@@ -379,7 +379,7 @@ class ViewTests(TestCase):
         p = ScanPage.objects.create(batch=b, position=30,
                                     scan_status=ScanPage.SCAN_DONE)
         r = self.client.get(f"/scans/{b.id}/pages/{p.id}/")
-        self.assertEqual(r.context["manual_volume"], "7")
+        self.assertEqual(r.context["manual_volume"], "07")
 
     def test_page_arn_override_rejects_bad_index(self):
         b = services.start_batch()

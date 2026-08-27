@@ -61,6 +61,17 @@
   var err = document.getElementById('err');
   var eff = document.getElementById('eff');
 
+  function padOnBlur(input, width) {
+    input.addEventListener('blur', function () {
+      var v = input.value.trim();
+      if (v !== '' && /^\d+$/.test(v)) {
+        input.value = v.padStart(width, '0').slice(-width);
+      }
+    });
+  }
+  padOnBlur(volumeInput, 2);
+  padOnBlur(indexInput, 3);
+
   document.querySelectorAll('[data-mode]').forEach(function (b) {
     b.addEventListener('click', function () {
       err.hidden = true; err.innerHTML = '';

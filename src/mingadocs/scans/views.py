@@ -184,7 +184,7 @@ def page_detail(request, batch_id, page_id):
         body = page.manual_arn[len(prefix):]
         if len(body) == 9 and body.isdigit():
             manual_year, manual_volume, manual_index = (
-                body[:4], str(int(body[4:6])), str(int(body[6:9])),
+                body[:4], body[4:6], body[6:9],
             )
     if not manual_volume:
         # Pre-fill the volume from the other pages in the batch if a strict
@@ -197,7 +197,7 @@ def page_detail(request, batch_id, page_id):
         if vols:
             top, n = vols.most_common(1)[0]
             if n * 2 > sum(vols.values()):
-                manual_volume = str(int(top))
+                manual_volume = top
     eff = page.effective_arn
     effective_label = _arn_labels(list(page.batch.pages.all())).get(page.id) or (
         eff.human_readable() if eff else ""
