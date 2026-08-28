@@ -8,14 +8,17 @@ from dataclasses import dataclass
 import zxingcpp
 from PIL import Image
 
+from .enums import OcrOutcome
+
 _CODE128 = zxingcpp.BarcodeFormats(zxingcpp.BarcodeFormat.Code128)
 
 
-@dataclass
+@dataclass(frozen=True)
 class OcrResult:
+    outcome: OcrOutcome
     arn: str | None          # decoded barcode text (prefix + body) or None
     note: str                # human-readable explanation when arn is None
-    candidate_count: int      # matching Code 128 symbols found
+    candidate_count: int     # matching Code 128 symbols found
 
 
 def detect_arn(image_bytes: bytes, prefix: str) -> OcrResult:
@@ -28,11 +31,17 @@ def detect_arn(image_bytes: bytes, prefix: str) -> OcrResult:
     img.load()
     matches = sorted(_scan_code128(img, prefix))
     if len(matches) == 1:
-        return OcrResult(arn=matches[0], note="", candidate_count=1)
+        return OcrResult(
+            outcome=OcrOutcome.FOUND, arn=matches[0], note="",
+            candidate_count=1,
+        )
     if not matches:
-        return OcrResult(arn=None, note="no ARN barcode found", candidate_count=0)
+        return OcrResult(
+            outcome=OcrOutcome.NOT_FOUND, arn=None,
+            note="no ARN barcode found", candidate_count=0,
+        )
     return OcrResult(
-        arn=None,
+        outcome=OcrOutcome.AMBIGUOUS, arn=None,
         note=f"{len(matches)} ARN barcodes found",
         candidate_count=len(matches),
     )

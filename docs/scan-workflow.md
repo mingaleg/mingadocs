@@ -174,13 +174,15 @@ The ARN **prefix** is shared with label printing (`arnlabels.PrintSettings`).
 
 | Module               | Responsibility |
 |----------------------|----------------|
+| `scans/enums.py`     | `BatchStatus` / `ScanStatus` / `OcrStatus` (TextChoices), `ArnSource`, `ArnMode`, `OcrOutcome`, `AlertLevel`, `AlertCode` |
 | `scans/models.py`    | `ScanSettings`, `ScanBatch`, `ScanPage`, `Document` |
+| `scans/schemas.py`   | Pydantic models for the JSON boundary (`BatchState`, `PageState`, `AlertState`, `ReorderRequest`, …) |
 | `scans/scanner.py`   | `scanimage` subprocess + fake-scanner override |
-| `scans/ocr.py`       | Code 128 → ARN detection (`zxing-cpp`) |
+| `scans/ocr.py`       | Code 128 → ARN detection (`zxing-cpp`); returns an `OcrResult` |
 | `scans/jobs.py`      | Background scan/OCR workers, restart recovery |
-| `scans/services.py`  | Batch lifecycle, alerts, finalization |
-| `scans/views.py`     | Console, review, page detail, document list, JSON endpoints |
-| `scans/forms.py`     | `ScanSettingsForm`, `PageArnForm` |
+| `scans/services.py`  | Batch lifecycle, alerts (`Alert` dataclass), finalization |
+| `scans/views.py`     | Console, review, page detail, document list, JSON endpoints — every payload is a `scans/schemas.py` model |
+| `scans/forms.py`     | `ScanSettingsForm`, `PageArnForm` (exposes `arn_mode()` / `arn_value()`) |
 | `scans/templates/scans/` | 5 templates, extend `arnlabels/base.html` |
 | `siteconfig/`        | The `/settings/` page (view + `probe.py` hardware cache); no models |
 

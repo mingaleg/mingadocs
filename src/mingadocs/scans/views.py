@@ -2,43 +2,53 @@
 from __future__ import annotations
 
 import datetime
-import json
 from collections import Counter
 from collections.abc import Iterable
-from typing import Any
+from dataclasses import dataclass
+from typing import Final
 
 from django.contrib import messages
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
+from pydantic import ValidationError
 
 from arnlabels.models import PrintSettings
 
 from . import services
+from .enums import BatchStatus
 from .forms import PageArnForm
 from .models import Document, ScanBatch, ScanPage
+from .schemas import (
+    AlertState,
+    BatchState,
+    PageArnResponse,
+    PageState,
+    ReorderRequest,
+    ScanPageStarted,
+)
+
+_XHR: Final = "XMLHttpRequest"
 
 
-def _page_json(page: ScanPage, arn_label: str | None = None) -> dict[str, Any]:
+def _page_state(page: ScanPage, arn_label: str | None = None) -> PageState:
     arn = page.effective_arn
     human = arn.human_readable() if arn else ""
-    return {
-        "id": page.id,
-        "position": page.position,
-        "thumb_url": page.thumbnail.url if page.thumbnail else "",
-        "image_url": page.image.url if page.image else "",
-        "scan_status": page.scan_status,
-        "ocr_status": page.ocr_status,
-        "arn": human,
-        # Display label: the ARN for a volume-start page, "page N" for a
-        # continuation (its 1-based position within its document).
-        "arn_label": human if arn_label is None else arn_label,
-        "arn_source": page.arn_source,
-        "ocr_note": page.ocr_note,
-        "needs_attention": page.needs_attention,
-        "detail_url": reverse("scans:page", args=[page.batch_id, page.id]),
-    }
+    return PageState(
+        id=page.id,
+        position=page.position,
+        thumb_url=page.thumbnail.url if page.thumbnail else "",
+        image_url=page.image.url if page.image else "",
+        scan_status=page.scan_state,
+        ocr_status=page.ocr_state,
+        arn=human,
+        arn_label=human if arn_label is None else arn_label,
+        arn_source=page.arn_source,
+        ocr_note=page.ocr_note,
+        needs_attention=page.needs_attention,
+        detail_url=reverse("scans:page", args=[page.batch_id, page.id]),
+    )
 
 
 def _arn_labels(pages: Iterable[ScanPage]) -> dict[int, str]:
@@ -58,28 +68,34 @@ def _arn_labels(pages: Iterable[ScanPage]) -> dict[int, str]:
     return labels
 
 
-def _status_payload(batch: ScanBatch) -> dict[str, Any]:
-    alerts = services.compute_alerts(batch)
+def _alert_states(batch: ScanBatch) -> list[AlertState]:
+    return [
+        AlertState(level=a.level, page_id=a.page_id, code=a.code, message=a.message)
+        for a in services.compute_alerts(batch)
+    ]
+
+
+def _batch_state(batch: ScanBatch) -> BatchState:
     pages = list(batch.pages.all())
     labels = _arn_labels(pages)
-    return {
-        "status": batch.status,
-        "scan_in_progress": services.scan_in_progress(batch),
-        "pages": [_page_json(p, labels.get(p.id)) for p in pages],
-        "alerts": [
-            {"level": a.level, "page_id": a.page_id, "code": a.code,
-             "message": a.message}
-            for a in alerts
-        ],
-        "finalizable": services.finalizable(batch),
-    }
+    return BatchState(
+        status=batch.status_enum,
+        scan_in_progress=services.scan_in_progress(batch),
+        pages=[_page_state(p, labels.get(p.id)) for p in pages],
+        alerts=_alert_states(batch),
+        finalizable=services.finalizable(batch),
+    )
+
+
+def _is_xhr(request: HttpRequest) -> bool:
+    return request.headers.get("x-requested-with") == _XHR
 
 
 def batch_list(request: HttpRequest) -> HttpResponse:
     return render(request, "scans/batch_list.html", {
         "nav": "scans",
-        "active": ScanBatch.objects.exclude(status=ScanBatch.FINALIZED),
-        "finalized": ScanBatch.objects.filter(status=ScanBatch.FINALIZED)[:10],
+        "active": ScanBatch.objects.exclude(status=BatchStatus.FINALIZED),
+        "finalized": ScanBatch.objects.filter(status=BatchStatus.FINALIZED)[:10],
         "documents": Document.objects.all()[:10],
     })
 
@@ -98,9 +114,9 @@ def new_batch(request: HttpRequest) -> HttpResponse:
 
 def batch_console(request: HttpRequest, batch_id: int) -> HttpResponse:
     batch = get_object_or_404(ScanBatch, pk=batch_id)
-    if batch.status == ScanBatch.REVIEW:
+    if batch.status_enum is BatchStatus.REVIEW:
         return redirect("scans:review", batch_id=batch.id)
-    if batch.status == ScanBatch.FINALIZED:
+    if batch.status_enum is BatchStatus.FINALIZED:
         messages.info(request, f"Batch #{batch.id} is finalized.")
         return redirect("scans:batch-list")
     return render(request, "scans/batch_console.html", {
@@ -110,17 +126,17 @@ def batch_console(request: HttpRequest, batch_id: int) -> HttpResponse:
 
 def batch_review(request: HttpRequest, batch_id: int) -> HttpResponse:
     batch = get_object_or_404(ScanBatch, pk=batch_id)
-    if batch.status == ScanBatch.SCANNING:
+    if batch.status_enum is BatchStatus.SCANNING:
         return redirect("scans:console", batch_id=batch.id)
     return render(request, "scans/batch_review.html", {
         "nav": "scans", "batch": batch,
-        "initial": json.dumps(_status_payload(batch)),
+        "initial": _batch_state(batch).model_dump_json(),
     })
 
 
 def batch_status(request: HttpRequest, batch_id: int) -> HttpResponse:
     batch = get_object_or_404(ScanBatch, pk=batch_id)
-    return JsonResponse(_status_payload(batch))
+    return JsonResponse(_batch_state(batch).model_dump(mode="json"))
 
 
 @require_POST
@@ -130,7 +146,8 @@ def scan_page(request: HttpRequest, batch_id: int) -> HttpResponse:
         page = services.add_scan_page(batch)
     except ValueError as exc:
         return JsonResponse({"error": str(exc)}, status=409)
-    return JsonResponse({"page_id": page.id, "position": page.position})
+    started = ScanPageStarted(page_id=page.id, position=page.position)
+    return JsonResponse(started.model_dump(mode="json"))
 
 
 @require_POST
@@ -138,7 +155,7 @@ def stop_batch(request: HttpRequest, batch_id: int) -> HttpResponse:
     batch = get_object_or_404(ScanBatch, pk=batch_id)
     services.stop_batch(batch)
     url = reverse("scans:review", args=[batch.id])
-    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+    if _is_xhr(request):
         return JsonResponse({"redirect": url})
     return redirect(url)
 
@@ -152,7 +169,7 @@ def discard_batch(request: HttpRequest, batch_id: int) -> HttpResponse:
         return JsonResponse({"error": str(exc)}, status=409)
     messages.success(request, f"Discarded batch #{batch_id}.")
     url = reverse("scans:batch-list")
-    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+    if _is_xhr(request):
         return JsonResponse({"redirect": url})
     return redirect(url)
 
@@ -161,9 +178,9 @@ def discard_batch(request: HttpRequest, batch_id: int) -> HttpResponse:
 def reorder(request: HttpRequest, batch_id: int) -> HttpResponse:
     batch = get_object_or_404(ScanBatch, pk=batch_id)
     try:
-        ids = json.loads(request.body)["ids"]
-        services.reorder(batch, [int(i) for i in ids])
-    except (ValueError, KeyError, TypeError) as exc:
+        payload = ReorderRequest.model_validate_json(request.body)
+        services.reorder(batch, payload.ids)
+    except (ValidationError, ValueError) as exc:
         return JsonResponse({"error": str(exc)}, status=400)
     return JsonResponse({"ok": True})
 
@@ -182,30 +199,49 @@ def finalize(request: HttpRequest, batch_id: int) -> HttpResponse:
     return JsonResponse({"redirect": reverse("scans:batch-list")})
 
 
+@dataclass(frozen=True)
+class _ManualArnDefaults:
+    """Pre-fill values for the manual-ARN form on the page-detail page."""
+
+    year: str
+    volume: str
+    index: str
+
+
+def _manual_defaults(page: ScanPage) -> _ManualArnDefaults:
+    year = str(datetime.date.today().year)
+    volume = ""
+    index = ""
+
+    override = page.effective_arn if page.manual_arn else None
+    if override is not None:
+        parts = override.parts
+        if parts is not None:
+            return _ManualArnDefaults(
+                year=f"{parts.year:04d}",
+                volume=f"{parts.volume:02d}",
+                index=f"{parts.index:03d}",
+            )
+
+    # Pre-fill the volume from the other pages in the batch when a strict
+    # majority of the resolved volume-start pages agree.
+    volumes: Counter[int] = Counter()
+    for other in page.batch.pages.all():
+        arn = other.effective_arn
+        if arn is not None and (parts := arn.parts) is not None:
+            volumes[parts.volume] += 1
+    if volumes:
+        top, count = volumes.most_common(1)[0]
+        if count * 2 > sum(volumes.values()):
+            volume = f"{top:02d}"
+
+    return _ManualArnDefaults(year=year, volume=volume, index=index)
+
+
 def page_detail(request: HttpRequest, batch_id: int, page_id: int) -> HttpResponse:
     page = get_object_or_404(ScanPage, pk=page_id, batch_id=batch_id)
     prefix = PrintSettings.get_solo().arn_prefix
-    manual_year = str(datetime.date.today().year)
-    manual_volume = ""
-    manual_index = ""
-    if page.manual_arn.startswith(prefix):
-        body = page.manual_arn[len(prefix):]
-        if len(body) == 9 and body.isdigit():
-            manual_year, manual_volume, manual_index = (
-                body[:4], body[4:6], body[6:9],
-            )
-    if not manual_volume:
-        # Pre-fill the volume from the other pages in the batch if a strict
-        # majority of the resolved volume-start pages agree.
-        vols: Counter[str] = Counter()
-        for other in page.batch.pages.all():
-            a = other.effective_arn
-            if a and not a.is_continuation:
-                vols[a.body[4:6]] += 1
-        if vols:
-            top, n = vols.most_common(1)[0]
-            if n * 2 > sum(vols.values()):
-                manual_volume = top
+    defaults = _manual_defaults(page)
     eff = page.effective_arn
     effective_label = _arn_labels(list(page.batch.pages.all())).get(page.id) or (
         eff.human_readable() if eff else ""
@@ -214,9 +250,9 @@ def page_detail(request: HttpRequest, batch_id: int, page_id: int) -> HttpRespon
         "nav": "scans", "batch": page.batch, "page": page,
         "form": PageArnForm(),
         "config_prefix": prefix,
-        "manual_year": manual_year,
-        "manual_volume": manual_volume,
-        "manual_index": manual_index,
+        "manual_year": defaults.year,
+        "manual_volume": defaults.volume,
+        "manual_index": defaults.index,
         "effective_label": effective_label,
     })
 
@@ -227,20 +263,14 @@ def page_arn(request: HttpRequest, batch_id: int, page_id: int) -> HttpResponse:
     form = PageArnForm(request.POST)
     if not form.is_valid():
         return JsonResponse({"errors": form.errors}, status=400)
-    mode = form.cleaned_data["mode"]
-    services.set_page_arn(
-        page,
-        arn=form.cleaned_data.get("arn", ""),
-        continuation=(mode == PageArnForm.MODE_CONTINUATION),
-        clear=(mode == PageArnForm.MODE_CLEAR),
-    )
+    services.set_page_arn(page, form.arn_mode(), form.arn_value())
     page.refresh_from_db()
-    pages = list(page.batch.pages.all())
-    labels = _arn_labels(pages)
-    return JsonResponse({
-        "page": _page_json(page, labels.get(page.id)),
-        "alerts": _status_payload(page.batch)["alerts"],
-    })
+    labels = _arn_labels(page.batch.pages.all())
+    response = PageArnResponse(
+        page=_page_state(page, labels.get(page.id)),
+        alerts=_alert_states(page.batch),
+    )
+    return JsonResponse(response.model_dump(mode="json"))
 
 
 @require_POST

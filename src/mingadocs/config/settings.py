@@ -13,6 +13,13 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 import os
 from pathlib import Path
 
+import django_stubs_ext
+
+# Make the runtime classes that django-stubs types as generic
+# (``ModelForm[M]``, ``ModelAdmin[M]``, ``QuerySet[M]``, …) subscriptable, so
+# the annotations we write are also valid at import time.
+django_stubs_ext.monkeypatch()
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 

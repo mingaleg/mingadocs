@@ -14,6 +14,7 @@ import io
 import logging
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
+from typing import Final
 
 from django.core.files.base import ContentFile
 from django.db import close_old_connections
@@ -22,14 +23,15 @@ from PIL import Image
 from arnlabels.models import PrintSettings
 
 from . import ocr, scanner
-from .models import ScanBatch, ScanPage, ScanSettings
+from .enums import BatchStatus, OcrStatus, ScanStatus
+from .models import ScanPage, ScanSettings
 
 log = logging.getLogger("scans")
 
 _SCAN_POOL = ThreadPoolExecutor(max_workers=1, thread_name_prefix="scan")
 _OCR_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="ocr")
 
-THUMB_WIDTH = 320
+THUMB_WIDTH: Final = 320
 
 
 def enqueue_scan(page_id: int) -> None:
@@ -57,8 +59,8 @@ def _run_scan(page_id: int) -> None:
         image_bytes = scanner.scan_page(cfg)
     except scanner.ScannerError as exc:
         ScanPage.objects.filter(pk=page_id).update(
-            scan_status=ScanPage.SCAN_FAILED,
-            ocr_status=ScanPage.OCR_FAILED,
+            scan_status=ScanStatus.FAILED,
+            ocr_status=OcrStatus.FAILED,
             ocr_note=str(exc)[:200],
         )
         return
@@ -77,7 +79,7 @@ def _run_scan(page_id: int) -> None:
     )
     page.width = width
     page.height = height
-    page.scan_status = ScanPage.SCAN_DONE
+    page.scan_status = ScanStatus.DONE
     page.save(update_fields=[
         "image", "thumbnail", "width", "height", "scan_status"
     ])
@@ -88,7 +90,7 @@ def _run_ocr(page_id: int) -> None:
     page = ScanPage.objects.get(pk=page_id)
     if not page.image:
         return
-    ScanPage.objects.filter(pk=page_id).update(ocr_status=ScanPage.OCR_RUNNING)
+    ScanPage.objects.filter(pk=page_id).update(ocr_status=OcrStatus.RUNNING)
 
     cfg = ScanSettings.get_solo()
     prefix = PrintSettings.get_solo().arn_prefix
@@ -103,17 +105,17 @@ def _run_ocr(page_id: int) -> None:
         except FutureTimeout:
             fut.cancel()
             ScanPage.objects.filter(pk=page_id).update(
-                ocr_status=ScanPage.OCR_TIMEOUT, ocr_note="OCR timed out"
+                ocr_status=OcrStatus.TIMEOUT, ocr_note="OCR timed out"
             )
             return
         except Exception as exc:  # noqa: BLE001
             ScanPage.objects.filter(pk=page_id).update(
-                ocr_status=ScanPage.OCR_FAILED, ocr_note=str(exc)[:200]
+                ocr_status=OcrStatus.FAILED, ocr_note=str(exc)[:200]
             )
             return
 
     ScanPage.objects.filter(pk=page_id).update(
-        ocr_status=ScanPage.OCR_DONE,
+        ocr_status=OcrStatus.DONE,
         detected_arn=result.arn or "",
         ocr_note=result.note,
     )
@@ -127,15 +129,15 @@ def recover_stale() -> None:
     """
     note = "interrupted by server restart"
     pending = ScanPage.objects.filter(
-        batch__status=ScanBatch.SCANNING, scan_status=ScanPage.SCAN_PENDING
+        batch__status=BatchStatus.SCANNING, scan_status=ScanStatus.PENDING
     ).update(
-        scan_status=ScanPage.SCAN_FAILED,
-        ocr_status=ScanPage.OCR_FAILED,
+        scan_status=ScanStatus.FAILED,
+        ocr_status=OcrStatus.FAILED,
         ocr_note=note,
     )
     running = ScanPage.objects.filter(
-        ocr_status=ScanPage.OCR_RUNNING
-    ).update(ocr_status=ScanPage.OCR_FAILED, ocr_note=note)
+        ocr_status=OcrStatus.RUNNING
+    ).update(ocr_status=OcrStatus.FAILED, ocr_note=note)
     if pending or running:
         log.info("recover_stale: %s pending scans, %s running OCR reset",
                  pending, running)

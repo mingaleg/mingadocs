@@ -7,6 +7,8 @@ It edits two django-solo singletons that live in their own domain apps:
 """
 from __future__ import annotations
 
+from enum import StrEnum
+
 from django.contrib import messages
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
@@ -20,13 +22,30 @@ from scans.models import ScanSettings
 from . import probe
 
 
+class SettingsSection(StrEnum):
+    """Which part of the unified settings page a POST targets."""
+
+    LABELS = "labels"
+    SCANNER = "scanner"
+    RESCAN = "rescan"
+
+
+def _posted_section(request: HttpRequest) -> SettingsSection | None:
+    if request.method != "POST":
+        return None
+    try:
+        return SettingsSection(request.POST.get("section", ""))
+    except ValueError:
+        return None
+
+
 def settings_page(request: HttpRequest) -> HttpResponse:
     """Label printing + scanner settings, one ``<section>`` each."""
     print_config = PrintSettings.get_solo()
     scan_config = ScanSettings.get_solo()
-    section = request.POST.get("section") if request.method == "POST" else None
+    section = _posted_section(request)
 
-    if section == "rescan":
+    if section is SettingsSection.RESCAN:
         probe.cups_printers(refresh=True)
         probe.sane_devices(refresh=True)
         messages.success(request, "Re-probed printers and scanners.")
@@ -35,7 +54,7 @@ def settings_page(request: HttpRequest) -> HttpResponse:
     printers = probe.cups_printers()
     devices = probe.sane_devices()
 
-    if section == "labels":
+    if section is SettingsSection.LABELS:
         print_form = PrintSettingsForm(request.POST, instance=print_config,
                                        printers=printers)
         scan_form = ScanSettingsForm(instance=scan_config, devices=devices)
@@ -43,7 +62,7 @@ def settings_page(request: HttpRequest) -> HttpResponse:
             print_form.save()
             messages.success(request, "Label settings saved.")
             return redirect(reverse("siteconfig:settings") + "#labels")
-    elif section == "scanner":
+    elif section is SettingsSection.SCANNER:
         scan_form = ScanSettingsForm(request.POST, instance=scan_config,
                                      devices=devices)
         print_form = PrintSettingsForm(instance=print_config, printers=printers)

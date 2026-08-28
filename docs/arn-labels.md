@@ -167,12 +167,13 @@ redirects there) and in the Django admin.
 
 | Module                        | Responsibility |
 |-------------------------------|----------------|
-| `arnlabels/arn.py`            | ARN grammar, formatting, ARN-list generation per page type |
-| `arnlabels/label_templates.py`| Physical sheet geometry |
+| `arnlabels/enums.py`          | `PageType`, `OutputMode` |
+| `arnlabels/arn.py`            | ARN grammar (`Arn` is a frozen, self-validating pydantic dataclass; `ArnParts` decodes the body), formatting, ARN-list generation |
+| `arnlabels/label_templates.py`| Physical sheet geometry (`LabelTemplate` dataclass) |
 | `arnlabels/pdf.py`            | reportlab rendering of a sheet |
 | `arnlabels/printing.py`       | CUPS integration (list queues, submit job) |
-| `arnlabels/services.py`       | Auto-population, sheet building, allocation recording |
-| `arnlabels/forms.py`          | Settings form + label batch form |
+| `arnlabels/services.py`       | Auto-population, sheet building, allocation recording; `LabelBatchInput` / `VolumeDefaults` / `Sheet` |
+| `arnlabels/forms.py`          | Settings form + label batch form (view validates `cleaned_data` into `LabelBatchInput`) |
 | `arnlabels/views.py`          | `/` overview, `/labels/` utility (`/labels/settings/` → unified settings page in `scans`) |
 | `arnlabels/static/arnlabels/app.css` | Shared stylesheet (light/dark) |
 | `arnlabels/models.py`         | `PrintSettings` (singleton), `VolumeAllocation` |

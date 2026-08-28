@@ -6,18 +6,20 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
+from scans.enums import BatchStatus
 from scans.models import Document, ScanBatch, ScanSettings
 
 from . import printing, services
+from .enums import OutputMode, PageType
 from .forms import LabelBatchForm
 from .models import PrintSettings, VolumeAllocation
-from .services import PAGE_VOLUME
+from .services import LabelBatchInput
 
 
 def index(request: HttpRequest) -> HttpResponse:
     """Landing page: current configuration and recent volume / scan activity."""
     config = PrintSettings.get_solo()
-    active_batches = ScanBatch.objects.exclude(status=ScanBatch.FINALIZED)
+    active_batches = ScanBatch.objects.exclude(status=BatchStatus.FINALIZED)
     return render(
         request,
         "arnlabels/index.html",
@@ -29,7 +31,7 @@ def index(request: HttpRequest) -> HttpResponse:
             "recent": VolumeAllocation.objects.all()[:8],
             "active_batches": active_batches,
             "recent_batches": ScanBatch.objects.filter(
-                status=ScanBatch.FINALIZED
+                status=BatchStatus.FINALIZED
             )[:5],
             "recent_documents": Document.objects.all()[:6],
         },
@@ -44,21 +46,25 @@ def label_utility(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         form = LabelBatchForm(request.POST)
         if form.is_valid():
-            data = form.cleaned_data
+            batch = LabelBatchInput.model_validate(form.cleaned_data)
             template = services.current_template()
             try:
-                sheet = services.build_sheet(data, config.arn_prefix)
+                sheet = services.build_sheet(batch, config.arn_prefix)
             except ValueError as exc:
                 form.add_error(None, str(exc))
             else:
-                want_print = data.get("output") or (
-                    "print" if config.print_directly_by_default else "pdf"
+                chosen = batch.output or (
+                    OutputMode.PRINT if config.print_directly_by_default
+                    else OutputMode.PDF
                 )
-                can_print = want_print == "print" and bool(config.cups_printer)
+                can_print = (
+                    chosen is OutputMode.PRINT and bool(config.cups_printer)
+                )
 
-                if data["page_type"] == PAGE_VOLUME:
+                if batch.page_type is PageType.VOLUME:
+                    assert batch.year is not None and batch.volume is not None
                     services.record_allocation(
-                        data["year"], data["volume"], sheet.max_index
+                        batch.year, batch.volume, sheet.max_index
                     )
 
                 if can_print:
@@ -85,10 +91,12 @@ def label_utility(request: HttpRequest) -> HttpResponse:
                 )
                 return response
     else:
+        defaults = services.suggest_volume_defaults()
         form = LabelBatchForm(
             initial={
-                "page_type": PAGE_VOLUME,
-                **services.suggest_volume_defaults(),
+                "page_type": PageType.VOLUME.value,
+                "year": defaults.year,
+                "volume": defaults.volume,
             }
         )
 
@@ -109,9 +117,9 @@ def label_utility(request: HttpRequest) -> HttpResponse:
             "template": services.current_template(),
             "can_print": bool(config.cups_printer),
             "default_output": (
-                "print"
+                OutputMode.PRINT.value
                 if config.print_directly_by_default and config.cups_printer
-                else "pdf"
+                else OutputMode.PDF.value
             ),
             "last_by_year": last_by_year,
         },

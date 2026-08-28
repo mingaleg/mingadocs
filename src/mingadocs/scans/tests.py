@@ -19,6 +19,7 @@ from PIL import Image
 
 from . import jobs, ocr, services
 from . import scanner as scanner_mod
+from .enums import BatchStatus, OcrStatus, ScanStatus
 from .models import Document, ScanBatch, ScanPage
 from .scanner import ScannerError, scan_page
 
@@ -132,7 +133,7 @@ def run_scan_sync(page):
     with mock.patch.object(jobs, "enqueue_ocr"):
         jobs._run_scan(page.id)
     page.refresh_from_db()
-    if page.scan_status == ScanPage.SCAN_DONE:
+    if page.scan_status == ScanStatus.DONE:
         jobs._run_ocr(page.id)
     page.refresh_from_db()
 
@@ -152,14 +153,14 @@ class BatchFlowTests(TestCase):
                 mock.patch.object(jobs, "enqueue_scan"):
             page = services.add_scan_page(batch)
             run_scan_sync(page)
-        self.assertEqual(page.scan_status, ScanPage.SCAN_DONE)
+        self.assertEqual(page.scan_status, ScanStatus.DONE)
         self.assertTrue(page.image)
         self.assertTrue(page.thumbnail)
         self.assertEqual(page.detected_arn, "ARN202600042")
 
         services.stop_batch(batch)
         batch.refresh_from_db()
-        self.assertEqual(batch.status, ScanBatch.REVIEW)
+        self.assertEqual(batch.status, BatchStatus.REVIEW)
 
     def test_scan_in_progress_blocks_second(self):
         batch = services.start_batch()
@@ -187,7 +188,7 @@ class BatchFlowTests(TestCase):
 
     def test_discard_batch_rejects_finalized(self):
         batch = services.start_batch()
-        batch.status = ScanBatch.FINALIZED
+        batch.status = BatchStatus.FINALIZED
         batch.save(update_fields=["status"])
         with self.assertRaises(ValueError):
             services.discard_batch(batch)
@@ -203,10 +204,10 @@ class BatchFlowTests(TestCase):
 @override_settings(MEDIA_ROOT=_TMP)
 class AlertTests(TestCase):
     def _page(self, batch, pos, *, detected="", manual="", cont=False,
-              scan=ScanPage.SCAN_DONE):
+              scan=ScanStatus.DONE):
         return ScanPage.objects.create(
             batch=batch, position=pos, scan_status=scan,
-            ocr_status=ScanPage.OCR_DONE, detected_arn=detected,
+            ocr_status=OcrStatus.DONE, detected_arn=detected,
             manual_arn=manual, manual_continuation=cont,
         )
 
@@ -258,8 +259,8 @@ class FinalizeTests(TestCase):
         Image.new("RGB", (200, 280), "white").save(buf, format="PNG")
         from django.core.files.base import ContentFile
         p = ScanPage.objects.create(
-            batch=batch, position=pos, scan_status=ScanPage.SCAN_DONE,
-            ocr_status=ScanPage.OCR_DONE, **kw,
+            batch=batch, position=pos, scan_status=ScanStatus.DONE,
+            ocr_status=OcrStatus.DONE, **kw,
         )
         p.image.save(f"p{pos}.png", ContentFile(buf.getvalue()), save=True)
         return p
@@ -276,7 +277,7 @@ class FinalizeTests(TestCase):
         self.assertEqual(len(docs), 2)
         self.assertEqual(sorted(d.page_count for d in docs), [1, 3])
         b.refresh_from_db()
-        self.assertEqual(b.status, ScanBatch.FINALIZED)
+        self.assertEqual(b.status, BatchStatus.FINALIZED)
         self.assertFalse(b.pages.exists())
         for d in docs:
             self.assertTrue(d.pdf.read().startswith(b"%PDF"))
@@ -325,6 +326,16 @@ class ViewTests(TestCase):
             set(data),
             {"status", "scan_in_progress", "pages", "alerts", "finalizable"},
         )
+        self.assertEqual(data["status"], BatchStatus.SCANNING.value)
+
+    def test_reorder_rejects_malformed_body(self):
+        b = services.start_batch()
+        services.stop_batch(b)
+        r = self.client.post(
+            f"/scans/{b.id}/reorder/", data="{\"ids\": [\"nope\"]}",
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 400)
 
     def test_scan_conflict_when_in_progress(self):
         b = services.start_batch()
@@ -337,13 +348,13 @@ class ViewTests(TestCase):
         b = services.start_batch()
         services.stop_batch(b)
         ScanPage.objects.create(batch=b, position=10,
-                                scan_status=ScanPage.SCAN_DONE,
-                                ocr_status=ScanPage.OCR_DONE,
+                                scan_status=ScanStatus.DONE,
+                                ocr_status=OcrStatus.DONE,
                                 detected_arn="ARN202600001")
         for pos in (20, 30):
             ScanPage.objects.create(batch=b, position=pos,
-                                    scan_status=ScanPage.SCAN_DONE,
-                                    ocr_status=ScanPage.OCR_DONE,
+                                    scan_status=ScanStatus.DONE,
+                                    ocr_status=OcrStatus.DONE,
                                     manual_continuation=True)
         pages = self.client.get(f"/scans/{b.id}/status/").json()["pages"]
         self.assertEqual([p["arn_label"] for p in pages],
@@ -353,8 +364,8 @@ class ViewTests(TestCase):
         b = services.start_batch()
         services.stop_batch(b)
         p = ScanPage.objects.create(batch=b, position=10,
-                                    scan_status=ScanPage.SCAN_DONE,
-                                    ocr_status=ScanPage.OCR_DONE)
+                                    scan_status=ScanStatus.DONE,
+                                    ocr_status=OcrStatus.DONE)
         r = self.client.post(f"/scans/{b.id}/pages/{p.id}/arn/", {
             "mode": "arn", "arn_prefix": "ARN",
             "arn_year": "2026", "arn_volume": "0", "arn_index": "42",
@@ -368,11 +379,11 @@ class ViewTests(TestCase):
         services.stop_batch(b)
         for pos, arn in ((10, "ARN202607001"), (20, "ARN202607002")):
             ScanPage.objects.create(batch=b, position=pos,
-                                    scan_status=ScanPage.SCAN_DONE,
-                                    ocr_status=ScanPage.OCR_DONE,
+                                    scan_status=ScanStatus.DONE,
+                                    ocr_status=OcrStatus.DONE,
                                     detected_arn=arn)
         p = ScanPage.objects.create(batch=b, position=30,
-                                    scan_status=ScanPage.SCAN_DONE)
+                                    scan_status=ScanStatus.DONE)
         r = self.client.get(f"/scans/{b.id}/pages/{p.id}/")
         self.assertEqual(r.context["manual_volume"], "07")
 
@@ -380,7 +391,7 @@ class ViewTests(TestCase):
         b = services.start_batch()
         services.stop_batch(b)
         p = ScanPage.objects.create(batch=b, position=10,
-                                    scan_status=ScanPage.SCAN_DONE)
+                                    scan_status=ScanStatus.DONE)
         r = self.client.post(f"/scans/{b.id}/pages/{p.id}/arn/", {
             "mode": "arn", "arn_prefix": "ARN",
             "arn_year": "2026", "arn_volume": "0", "arn_index": "9999",
@@ -392,7 +403,7 @@ class ViewTests(TestCase):
         b = services.start_batch()
         services.stop_batch(b)
         ScanPage.objects.create(batch=b, position=10,
-                                scan_status=ScanPage.SCAN_DONE)
+                                scan_status=ScanStatus.DONE)
         r = self.client.post(f"/scans/{b.id}/finalize/")
         self.assertEqual(r.status_code, 409)
 
@@ -402,7 +413,7 @@ class RecoverStaleTests(TestCase):
     def test_pending_marked_failed(self):
         b = services.start_batch()
         p = ScanPage.objects.create(batch=b, position=10,
-                                    scan_status=ScanPage.SCAN_PENDING)
+                                    scan_status=ScanStatus.PENDING)
         jobs.recover_stale()
         p.refresh_from_db()
-        self.assertEqual(p.scan_status, ScanPage.SCAN_FAILED)
+        self.assertEqual(p.scan_status, ScanStatus.FAILED)

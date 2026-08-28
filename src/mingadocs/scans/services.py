@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import io
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Final
 
 from django.core.files.base import ContentFile
 from django.db import transaction
@@ -13,13 +14,14 @@ from arnlabels.arn import Arn
 from arnlabels.models import PrintSettings
 
 from . import jobs
+from .enums import AlertCode, AlertLevel, ArnMode, BatchStatus, ScanStatus
 from .models import Document, ScanBatch, ScanPage
 
-POSITION_STEP = 10
+POSITION_STEP: Final = 10
 
 
 def start_batch() -> ScanBatch:
-    return ScanBatch.objects.create(status=ScanBatch.SCANNING)
+    return ScanBatch.objects.create(status=BatchStatus.SCANNING)
 
 
 def scan_in_progress(batch: ScanBatch) -> bool:
@@ -28,11 +30,11 @@ def scan_in_progress(batch: ScanBatch) -> bool:
     The button re-enables as soon as the scan finishes, even if OCR is still
     pending for that page.
     """
-    return batch.pages.filter(scan_status=ScanPage.SCAN_PENDING).exists()
+    return batch.pages.filter(scan_status=ScanStatus.PENDING).exists()
 
 
 def add_scan_page(batch: ScanBatch) -> ScanPage:
-    if batch.status != ScanBatch.SCANNING:
+    if batch.status_enum is not BatchStatus.SCANNING:
         raise ValueError("batch is not scanning")
     if scan_in_progress(batch):
         raise ValueError("a scan is already in progress")
@@ -44,9 +46,9 @@ def add_scan_page(batch: ScanBatch) -> ScanPage:
 
 
 def stop_batch(batch: ScanBatch) -> None:
-    if batch.status != ScanBatch.SCANNING:
+    if batch.status_enum is not BatchStatus.SCANNING:
         return
-    batch.status = ScanBatch.REVIEW
+    batch.status = BatchStatus.REVIEW
     batch.stopped_at = timezone.now()
     batch.save(update_fields=["status", "stopped_at"])
 
@@ -54,7 +56,7 @@ def stop_batch(batch: ScanBatch) -> None:
 @transaction.atomic
 def discard_batch(batch: ScanBatch) -> None:
     """Hard-delete a non-finalized batch and every scanned page + image file."""
-    if batch.status == ScanBatch.FINALIZED:
+    if batch.status_enum is BatchStatus.FINALIZED:
         raise ValueError("a finalized batch cannot be discarded")
     for page in batch.pages.all():
         page.image.delete(save=False)
@@ -62,12 +64,17 @@ def discard_batch(batch: ScanBatch) -> None:
     batch.delete()
 
 
-def set_page_arn(page: ScanPage, *, arn: str = "", continuation: bool = False,
-                 clear: bool = False) -> None:
-    if clear:
+def set_page_arn(page: ScanPage, mode: ArnMode, arn: str = "") -> None:
+    """Apply a manual override to ``page``.
+
+    * ``ArnMode.CLEAR``        — drop the override, fall back to detection
+    * ``ArnMode.CONTINUATION`` — mark the page a continuation
+    * ``ArnMode.SET``          — pin ``arn`` (raises ``ValueError`` if invalid)
+    """
+    if mode is ArnMode.CLEAR:
         page.manual_arn = ""
         page.manual_continuation = False
-    elif continuation:
+    elif mode is ArnMode.CONTINUATION:
         page.manual_arn = ""
         page.manual_continuation = True
     else:
@@ -95,11 +102,11 @@ def reorder(batch: ScanBatch, ordered_ids: list[int]) -> None:
 
 # --- alerts ---------------------------------------------------------------
 
-@dataclass
+@dataclass(frozen=True)
 class Alert:
-    level: str      # "warn" | "error"
+    level: AlertLevel
     page_id: int | None
-    code: str
+    code: AlertCode
     message: str
 
 
@@ -107,7 +114,7 @@ def compute_alerts(batch: ScanBatch) -> list[Alert]:
     alerts: list[Alert] = []
     pages = list(batch.pages.all())
 
-    existing = set(
+    existing: set[str] = set(
         Document.objects.values_list("start_arn", flat=True)
     )
     seen_starts: dict[str, int] = {}
@@ -117,38 +124,43 @@ def compute_alerts(batch: ScanBatch) -> list[Alert]:
         arn = page.effective_arn
         if arn is None:
             note = page.ocr_note or "no ARN detected"
-            alerts.append(Alert("error", page.id, "unassigned",
-                                f"Page {page.position}: {note} — set the ARN."))
+            alerts.append(Alert(
+                AlertLevel.ERROR, page.id, AlertCode.UNASSIGNED,
+                f"Page {page.position}: {note} — set the ARN.",
+            ))
             continue
         if arn.is_continuation:
             if not open_document:
                 alerts.append(Alert(
-                    "error", page.id, "orphan_continuation",
+                    AlertLevel.ERROR, page.id, AlertCode.ORPHAN_CONTINUATION,
                     f"Page {page.position} is a continuation with no document "
-                    f"started before it."))
+                    f"started before it.",
+                ))
             continue
         # volume-start ARN
         open_document = True
         value = arn.barcode_value()
         if value in seen_starts:
             alerts.append(Alert(
-                "error", page.id, "duplicate_in_batch",
+                AlertLevel.ERROR, page.id, AlertCode.DUPLICATE_IN_BATCH,
                 f"Page {page.position}: {arn.human_readable()} is also on "
-                f"page {seen_starts[value]}."))
+                f"page {seen_starts[value]}.",
+            ))
         else:
             seen_starts[value] = page.position
         if value in existing:
             alerts.append(Alert(
-                "error", page.id, "conflict_existing",
+                AlertLevel.ERROR, page.id, AlertCode.CONFLICT_EXISTING,
                 f"Page {page.position}: a document "
-                f"{arn.human_readable()} already exists."))
+                f"{arn.human_readable()} already exists.",
+            ))
 
     return alerts
 
 
 def finalizable(batch: ScanBatch) -> bool:
     return (
-        batch.status == ScanBatch.REVIEW
+        batch.status_enum is BatchStatus.REVIEW
         and batch.pages.exists()
         and not compute_alerts(batch)
     )
@@ -167,31 +179,37 @@ def _pages_to_pdf(pages: list[ScanPage]) -> bytes:
     return buf.getvalue()
 
 
+@dataclass
+class _DocumentGroup:
+    start: Arn
+    pages: list[ScanPage] = field(default_factory=list)
+
+
 @transaction.atomic
 def finalize_batch(batch: ScanBatch) -> list[Document]:
     if not finalizable(batch):
         raise ValueError("batch has unresolved alerts or no pages")
 
     pages = list(batch.pages.all())
-    groups: list[tuple[Arn, list[ScanPage]]] = []
+    groups: list[_DocumentGroup] = []
     for page in pages:
         arn = page.effective_arn
         if arn is None:  # unreachable: finalizable() rules this out
             raise ValueError(f"page {page.position} has no effective ARN")
-        if not arn.is_continuation:
-            groups.append((arn, [page]))
+        if arn.is_continuation:
+            groups[-1].pages.append(page)
         else:
-            groups[-1][1].append(page)
+            groups.append(_DocumentGroup(start=arn, pages=[page]))
 
-    documents = []
-    for start_arn, group_pages in groups:
-        pdf_bytes = _pages_to_pdf(group_pages)
+    documents: list[Document] = []
+    for group in groups:
+        pdf_bytes = _pages_to_pdf(group.pages)
         doc = Document.objects.create(
-            start_arn=start_arn.barcode_value(),
-            page_count=len(group_pages),
+            start_arn=group.start.barcode_value(),
+            page_count=len(group.pages),
             batch=batch,
         )
-        doc.pdf.save(f"{start_arn.barcode_value()}.pdf",
+        doc.pdf.save(f"{group.start.barcode_value()}.pdf",
                      ContentFile(pdf_bytes), save=True)
         documents.append(doc)
 
@@ -200,7 +218,7 @@ def finalize_batch(batch: ScanBatch) -> list[Document]:
         page.thumbnail.delete(save=False)
     batch.pages.all().delete()
 
-    batch.status = ScanBatch.FINALIZED
+    batch.status = BatchStatus.FINALIZED
     batch.finalized_at = timezone.now()
     batch.save(update_fields=["status", "finalized_at"])
     return documents

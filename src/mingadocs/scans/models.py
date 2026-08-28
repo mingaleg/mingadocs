@@ -12,6 +12,8 @@ from solo.models import SingletonModel
 from arnlabels.arn import Arn
 from arnlabels.models import PrintSettings
 
+from .enums import ArnSource, BatchStatus, OcrStatus, ScanStatus
+
 
 class ScanSettings(SingletonModel):
     """Global, permanent scanner configuration."""
@@ -41,17 +43,10 @@ class ScanSettings(SingletonModel):
 
 
 class ScanBatch(models.Model):
-    SCANNING = "scanning"
-    REVIEW = "review"
-    FINALIZED = "finalized"
-    STATUS_CHOICES = [
-        (SCANNING, "Scanning"),
-        (REVIEW, "Ready for review"),
-        (FINALIZED, "Finalized"),
-    ]
-
     status = models.CharField(
-        max_length=16, choices=STATUS_CHOICES, default=SCANNING
+        max_length=16,
+        choices=BatchStatus.choices,
+        default=BatchStatus.SCANNING,
     )
     created_at = models.DateTimeField(auto_now_add=True)
     stopped_at = models.DateTimeField(null=True, blank=True)
@@ -64,18 +59,12 @@ class ScanBatch(models.Model):
     def __str__(self) -> str:  # pragma: no cover - trivial
         return f"Batch #{self.pk} ({self.status})"
 
+    @property
+    def status_enum(self) -> BatchStatus:
+        return BatchStatus(self.status)
+
 
 class ScanPage(models.Model):
-    SCAN_PENDING = "pending"
-    SCAN_DONE = "done"
-    SCAN_FAILED = "failed"
-
-    OCR_PENDING = "pending"
-    OCR_RUNNING = "running"
-    OCR_DONE = "done"
-    OCR_FAILED = "failed"
-    OCR_TIMEOUT = "timeout"
-
     batch = models.ForeignKey(
         ScanBatch, on_delete=models.CASCADE, related_name="pages"
     )
@@ -87,8 +76,12 @@ class ScanPage(models.Model):
     width = models.PositiveIntegerField(null=True, blank=True)
     height = models.PositiveIntegerField(null=True, blank=True)
 
-    scan_status = models.CharField(max_length=16, default=SCAN_PENDING)
-    ocr_status = models.CharField(max_length=16, default=OCR_PENDING)
+    scan_status = models.CharField(
+        max_length=16, choices=ScanStatus.choices, default=ScanStatus.PENDING,
+    )
+    ocr_status = models.CharField(
+        max_length=16, choices=OcrStatus.choices, default=OcrStatus.PENDING,
+    )
 
     detected_arn = models.CharField(
         max_length=64, blank=True,
@@ -105,6 +98,14 @@ class ScanPage(models.Model):
 
     def __str__(self) -> str:  # pragma: no cover - trivial
         return f"Page {self.position} of batch #{self.batch_id}"
+
+    @property
+    def scan_state(self) -> ScanStatus:
+        return ScanStatus(self.scan_status)
+
+    @property
+    def ocr_state(self) -> OcrStatus:
+        return OcrStatus(self.ocr_status)
 
     @property
     def effective_arn(self) -> Arn | None:
@@ -124,12 +125,12 @@ class ScanPage(models.Model):
         return None
 
     @property
-    def arn_source(self) -> str:
+    def arn_source(self) -> ArnSource:
         if self.manual_continuation or self.manual_arn:
-            return "manual"
+            return ArnSource.MANUAL
         if self.detected_arn:
-            return "detected"
-        return "none"
+            return ArnSource.DETECTED
+        return ArnSource.NONE
 
     @property
     def needs_attention(self) -> bool:

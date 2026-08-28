@@ -8,16 +8,32 @@ process** and cache the result; the user refreshes it explicitly with the
 """
 from __future__ import annotations
 
-from django.core.cache import cache
+from typing import Final
 
-_DEVICES_KEY = "siteconfig:sane_devices"
-_PRINTERS_KEY = "siteconfig:cups_printers"
-_TTL = 60 * 60  # seconds
+from django.core.cache import cache
+from pydantic import TypeAdapter
+
+_DEVICES_KEY: Final = "siteconfig:sane_devices"
+_PRINTERS_KEY: Final = "siteconfig:cups_printers"
+_TTL: Final = 60 * 60  # seconds
+
+_STR_LIST: Final = TypeAdapter(list[str])
+
+
+def _cached_list(key: str) -> list[str] | None:
+    """Return a cached string list, or ``None`` if absent / corrupt."""
+    raw = cache.get(key)
+    if raw is None:
+        return None
+    try:
+        return _STR_LIST.validate_python(raw)
+    except ValueError:
+        return None
 
 
 def sane_devices(*, refresh: bool = False) -> list[str]:
     if not refresh:
-        cached = cache.get(_DEVICES_KEY)
+        cached = _cached_list(_DEVICES_KEY)
         if cached is not None:
             return cached
     from scans import scanner
@@ -32,7 +48,7 @@ def sane_devices(*, refresh: bool = False) -> list[str]:
 
 def cups_printers(*, refresh: bool = False) -> list[str]:
     if not refresh:
-        cached = cache.get(_PRINTERS_KEY)
+        cached = _cached_list(_PRINTERS_KEY)
         if cached is not None:
             return cached
     from arnlabels.printing import list_printers

@@ -6,8 +6,10 @@ import tempfile
 
 import cups
 
+PrinterAttrs = dict[str, str | int | bool | list[str]]
 
-def list_printers() -> dict[str, dict]:
+
+def list_printers() -> dict[str, PrinterAttrs]:
     """Return ``{queue_name: attributes}`` for all CUPS queues (for settings UI)."""
     return cups.Connection().getPrinters()
 

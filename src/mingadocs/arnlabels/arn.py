@@ -13,36 +13,64 @@ See ``docs/arn-labels.md``.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+import dataclasses
+from typing import Final
 
-CONTINUATION_BODY = "0" * 9
+from pydantic import field_validator, model_validator
+from pydantic.dataclasses import dataclass
+
+CONTINUATION_BODY: Final = "0" * 9
+_BODY_LEN: Final = 9
+
+YEAR_MIN: Final = 1000
+YEAR_MAX: Final = 9999
+VOLUME_MAX: Final = 99
+INDEX_MAX: Final = 999
+
+
+@dataclasses.dataclass(frozen=True)
+class ArnParts:
+    """The decoded fields of a volume-start ARN body."""
+
+    year: int
+    volume: int
+    index: int
 
 
 @dataclass(frozen=True)
 class Arn:
     prefix: str
-    body: str  # 9 digits
+    body: str  # exactly 9 digits
 
-    def __post_init__(self) -> None:
-        if len(self.body) != 9 or not self.body.isdigit():
-            raise ValueError(f"ARN body must be 9 digits, got {self.body!r}")
+    @field_validator("body")
+    @classmethod
+    def _body_is_nine_digits(cls, value: str) -> str:
+        if len(value) != _BODY_LEN or not value.isdigit():
+            raise ValueError(f"ARN body must be 9 digits, got {value!r}")
+        return value
+
+    @model_validator(mode="after")
+    def _prefix_not_empty(self) -> Arn:
+        if not self.prefix:
+            raise ValueError("ARN prefix must not be empty")
+        return self
 
     @classmethod
-    def volume_start(cls, prefix: str, year: int, volume: int, index: int) -> "Arn":
-        if not 1000 <= year <= 9999:
+    def volume_start(cls, prefix: str, year: int, volume: int, index: int) -> Arn:
+        if not YEAR_MIN <= year <= YEAR_MAX:
             raise ValueError(f"year must be 4 digits, got {year}")
-        if not 0 <= volume <= 99:
-            raise ValueError(f"volume must be 0..99, got {volume}")
-        if not 0 <= index <= 999:
-            raise ValueError(f"index must be 0..999, got {index}")
+        if not 0 <= volume <= VOLUME_MAX:
+            raise ValueError(f"volume must be 0..{VOLUME_MAX}, got {volume}")
+        if not 0 <= index <= INDEX_MAX:
+            raise ValueError(f"index must be 0..{INDEX_MAX}, got {index}")
         return cls(prefix, f"{year:04d}{volume:02d}{index:03d}")
 
     @classmethod
-    def continuation(cls, prefix: str) -> "Arn":
+    def continuation(cls, prefix: str) -> Arn:
         return cls(prefix, CONTINUATION_BODY)
 
     @classmethod
-    def parse(cls, value: str, prefix: str) -> "Arn":
+    def parse(cls, value: str, prefix: str) -> Arn:
         """Parse a raw barcode string (``prefix`` + 9 digits, no space).
 
         Raises ``ValueError`` if it does not start with ``prefix`` or the
@@ -51,17 +79,25 @@ class Arn:
         value = value.strip()
         if not prefix or not value.startswith(prefix):
             raise ValueError(f"{value!r} does not start with prefix {prefix!r}")
-        body = value[len(prefix):]
-        if len(body) != 9 or not body.isdigit():
-            raise ValueError(f"ARN body must be 9 digits, got {body!r}")
-        return cls(prefix, body)
+        return cls(prefix, value[len(prefix):])
 
     @property
     def is_continuation(self) -> bool:
         return self.body == CONTINUATION_BODY
 
+    @property
+    def parts(self) -> ArnParts | None:
+        """Decoded year / volume / index, or ``None`` for a continuation."""
+        if self.is_continuation:
+            return None
+        return ArnParts(
+            year=int(self.body[:4]),
+            volume=int(self.body[4:6]),
+            index=int(self.body[6:]),
+        )
+
     def barcode_value(self) -> str:
-        """Value encoded in Code 128 (no space)."""
+        """Value encoded in Code 128 (no separators)."""
         return f"{self.prefix}{self.body}"
 
     def human_readable(self) -> str:
@@ -71,10 +107,13 @@ class Arn:
         continuation stays ``<prefix> <body>`` (it has no such structure).
         The barcode value is unaffected — see ``barcode_value``.
         """
-        if self.is_continuation:
+        parts = self.parts
+        if parts is None:
             return f"{self.prefix} {self.body}"
-        year, volume, index = self.body[:4], self.body[4:6], self.body[6:]
-        return f"{self.prefix} {year} {volume} {index}"
+        return (
+            f"{self.prefix} {parts.year:04d} "
+            f"{parts.volume:02d} {parts.index:03d}"
+        )
 
 
 def volume_page_arns(

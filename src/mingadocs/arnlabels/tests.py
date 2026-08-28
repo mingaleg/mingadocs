@@ -1,10 +1,12 @@
 from django.test import TestCase
 
 from .arn import Arn, continuation_page_arns, volume_page_arns
+from .enums import PageType
 from .label_templates import AVERY_L4731REV as T
 from .models import VolumeAllocation
 from .pdf import render_sheet
 from . import services
+from .services import LabelBatchInput
 
 
 class ArnTests(TestCase):
@@ -20,6 +22,18 @@ class ArnTests(TestCase):
         self.assertEqual(a.body, "000000000")
         self.assertTrue(a.is_continuation)
         self.assertEqual(a.human_readable(), "X 000000000")
+
+    def test_parts_decode(self):
+        parts = Arn("ARN", "202604042").parts
+        assert parts is not None
+        self.assertEqual((parts.year, parts.volume, parts.index), (2026, 4, 42))
+        self.assertIsNone(Arn.continuation("ARN").parts)
+
+    def test_rejects_bad_body(self):
+        with self.assertRaises(ValueError):
+            Arn("ARN", "12345")
+        with self.assertRaises(ValueError):
+            Arn("", "202604042")
 
     def test_volume_page_arns_inclusive(self):
         arns = volume_page_arns("ARN", 2026, 0, 5)
@@ -142,24 +156,26 @@ class ViewTests(TestCase):
 class ServiceTests(TestCase):
     def test_suggest_defaults_first_volume(self):
         d = services.suggest_volume_defaults()
-        self.assertEqual(d["volume"], 0)
-        self.assertNotIn("max_index", d)
+        self.assertEqual(d.volume, 0)
 
     def test_suggest_defaults_increments(self):
-        year = services.suggest_volume_defaults()["year"]
+        year = services.suggest_volume_defaults().year
         VolumeAllocation.objects.create(year=year, volume=3, max_index=188)
-        self.assertEqual(services.suggest_volume_defaults()["volume"], 4)
+        self.assertEqual(services.suggest_volume_defaults().volume, 4)
 
     def test_build_volume_sheet_fills_whole_sheet(self):
         sheet = services.build_sheet(
-            {"page_type": "volume", "year": 2026, "volume": 2}, "ARN"
+            LabelBatchInput(page_type=PageType.VOLUME, year=2026, volume=2),
+            "ARN",
         )
         self.assertEqual(sheet.label_count, T.labels_per_sheet)
         self.assertEqual(sheet.max_index, T.labels_per_sheet - 1)
         self.assertEqual(sheet.filename, "arn-2026-02.pdf")
 
     def test_build_continuation_sheet(self):
-        sheet = services.build_sheet({"page_type": "continuation"}, "ARN")
+        sheet = services.build_sheet(
+            LabelBatchInput(page_type=PageType.CONTINUATION), "ARN"
+        )
         self.assertEqual(sheet.label_count, 189)
 
     def test_record_allocation_keeps_max(self):

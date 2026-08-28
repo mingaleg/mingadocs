@@ -28,6 +28,8 @@ Future work: storage/retention, electronic-document intake, search, auth.
 - `django-solo` for singleton (global, permanent) settings
 - `Pillow` + `zxing-cpp` for reading ARN barcodes off scans
 - SANE's `scanimage` CLI (system package `sane-utils`) to drive the scanner
+- `pydantic` v2 for the typed data that crosses boundaries (form input, JSON
+  request/response payloads, cached values)
 
 ## Layout
 
@@ -74,9 +76,23 @@ Templates extend `arnlabels/base.html`; styling is one stylesheet at
 
 | Tool     | `make` target | Scope |
 |----------|---------------|-------|
-| `mypy`   | `make mypy`   | `src/mingadocs` + `tools/`, with `django-stubs`; migrations excluded. Full annotations required (`disallow_untyped_defs`); tests are checked but not annotation-gated. |
+| `mypy`   | `make mypy`   | `src/mingadocs` + `tools/`, with `django-stubs` and `pydantic.mypy`; migrations excluded. Strict: `disallow_untyped_defs`, `disallow_untyped_calls`, `disallow_any_explicit`, `disallow_any_generics`, `disallow_subclassing_any`, `warn_return_any`. Tests are checked but exempt from the annotation / no-`Any` rules. |
 | `pylint` | `make pylint` | Same source, `pylint-django` plugin. `broad-exception-caught` is disabled project-wide (deliberate degrade-gracefully handlers, each also tagged `# noqa: BLE001`). |
 | `bandit` | `make bandit` | `src/mingadocs`. Reviewed subprocess / try-except sites carry inline `# nosec <ID>`. |
 
-Third-party packages without type info (`cups`, `reportlab`, `solo`) are given
-`ignore_missing_imports`; `zxing-cpp` ships its own stubs.
+### Typing conventions
+
+- **No `Any` in first-party logic.** External data (`form.cleaned_data`, JSON
+  request bodies, `cache.get`) is turned into a pydantic model at the boundary
+  and only the model is used afterwards.
+- **Enums for every closed vocabulary** — see `scans/enums.py` and
+  `arnlabels/enums.py` (batch/scan/OCR status, ARN source, alert level/code,
+  page type, …). DB-backed ones are `models.TextChoices`; the rest `StrEnum`.
+- **Dataclasses for internal value objects** (`Arn`, `LabelTemplate`, `Alert`,
+  `OcrResult`, `Sheet`); **pydantic models** for anything parsed or serialised
+  (`scans/schemas.py`, `LabelBatchInput`, `VolumeDefaults`).
+- Local stubs for untyped C extensions live in `stubs/` (`cups`, `reportlab`);
+  `mypy_path` includes it. `zxing-cpp` and `django-solo` ship their own types.
+- `django-stubs` types `ModelForm` / `ModelAdmin` / `QuerySet` etc. as generic;
+  `config/settings.py` calls `django_stubs_ext.monkeypatch()` so the
+  `Foo[Model]` annotations are also valid at runtime.
