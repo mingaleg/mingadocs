@@ -17,8 +17,7 @@ import zxingcpp
 from django.test import TestCase, override_settings
 from PIL import Image
 
-from . import jobs, ocr, services
-from . import scanner as scanner_mod
+from . import jobs, ocr, scanner as scanner_mod, services
 from .enums import BatchStatus, OcrStatus, ScanStatus
 from .models import Document, ScanBatch, ScanPage
 from .scanner import ScannerError, scan_page
@@ -95,9 +94,9 @@ class ScannerTests(TestCase):
             os.unlink(path)
 
     def test_scanner_error_when_missing_binary(self):
-        with mock.patch("subprocess.run", side_effect=FileNotFoundError()):
-            with self.assertRaises(ScannerError):
-                scan_page(mock.Mock(sane_device="", resolution_dpi=300, mode="Color"))
+        with mock.patch("subprocess.run", side_effect=FileNotFoundError()), \
+                self.assertRaises(ScannerError):
+            scan_page(mock.Mock(sane_device="", resolution_dpi=300, mode="Color"))
 
     def test_retries_with_fewer_options_on_failure(self):
         calls = []
@@ -118,14 +117,15 @@ class ScannerTests(TestCase):
 
     def test_rejects_html_error_page_as_output(self):
         with mock.patch("subprocess.run", return_value=mock.Mock(
-                returncode=0, stdout=b"<!DOCTYPE HTML><html>...", stderr=b"")):
-            with self.assertRaises(ScannerError):
-                scan_page(mock.Mock(sane_device="d", resolution_dpi=0, mode=""))
+                returncode=0, stdout=b"<!DOCTYPE HTML><html>...", stderr=b"")), \
+                self.assertRaises(ScannerError):
+            scan_page(mock.Mock(sane_device="d", resolution_dpi=0, mode=""))
 
     def test_no_device_selected_errors(self):
-        with mock.patch.object(scanner_mod, "list_devices", return_value=["a", "b"]):
-            with self.assertRaises(ScannerError):
-                scan_page(mock.Mock(sane_device="", resolution_dpi=300, mode="Color"))
+        with mock.patch.object(
+            scanner_mod, "list_devices", return_value=["a", "b"]
+        ), self.assertRaises(ScannerError):
+            scan_page(mock.Mock(sane_device="", resolution_dpi=300, mode="Color"))
 
 
 def run_scan_sync(page):
@@ -141,9 +141,8 @@ def run_scan_sync(page):
 @override_settings(MEDIA_ROOT=_TMP)
 class BatchFlowTests(TestCase):
     def _fake(self, data: bytes):
-        fh = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-        fh.write(data)
-        fh.close()
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as fh:
+            fh.write(data)
         self.addCleanup(os.unlink, fh.name)
         return mock.patch.dict(os.environ, {"MINGADOCS_FAKE_SCANNER": fh.name})
 

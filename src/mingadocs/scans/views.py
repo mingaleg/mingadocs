@@ -1,7 +1,6 @@
 """Views for the scan intake workflow. See docs/scan-workflow.md."""
 from __future__ import annotations
 
-import datetime
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -11,6 +10,7 @@ from django.contrib import messages
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 from pydantic import ValidationError
 
@@ -209,7 +209,7 @@ class _ManualArnDefaults:
 
 
 def _manual_defaults(page: ScanPage) -> _ManualArnDefaults:
-    year = str(datetime.date.today().year)
+    year = str(timezone.localdate().year)
     volume = ""
     index = ""
 

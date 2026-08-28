@@ -71,11 +71,12 @@ Templates extend `arnlabels/base.html`; styling is one stylesheet at
 
 ## Static analysis
 
-`make lint` runs three checkers; all are expected to pass with zero findings
+`make lint` runs four checkers; all are expected to pass with zero findings
 (config lives in `pyproject.toml`):
 
 | Tool     | `make` target | Scope |
 |----------|---------------|-------|
+| `ruff`   | `make ruff`   | `src/mingadocs` + `tools/` + `stubs/`; migrations excluded. Rule set: pyflakes/pycodestyle, isort, pyupgrade, bugbear, blind-except, comprehensions, flake8-{django,datetimez,executable,logging,pie,return,simplify}, ruff-specific. Security lint is left to bandit. `RUF012` is ignored in Django declarative modules; stubs may keep the upstream camelCase names. |
 | `mypy`   | `make mypy`   | `src/mingadocs` + `tools/`, with `django-stubs` and `pydantic.mypy`; migrations excluded. Strict: `disallow_untyped_defs`, `disallow_untyped_calls`, `disallow_any_explicit`, `disallow_any_generics`, `disallow_subclassing_any`, `warn_return_any`. Tests are checked but exempt from the annotation / no-`Any` rules. |
 | `pylint` | `make pylint` | Same source, `pylint-django` plugin. `broad-exception-caught` is disabled project-wide (deliberate degrade-gracefully handlers, each also tagged `# noqa: BLE001`). |
 | `bandit` | `make bandit` | `src/mingadocs`. Reviewed subprocess / try-except sites carry inline `# nosec <ID>`. |

@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
 
 from django.conf import settings
+from django.utils import timezone
 from pydantic import BaseModel, ConfigDict
 
 from .arn import continuation_page_arns, volume_page_arns
@@ -35,7 +35,7 @@ class VolumeDefaults(BaseModel):
 
 
 def suggest_volume_defaults() -> VolumeDefaults:
-    year = date.today().year
+    year = timezone.localdate().year
     last = latest_volume(year)
     return VolumeDefaults(
         year=year,

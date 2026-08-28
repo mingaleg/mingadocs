@@ -4,7 +4,7 @@ See ``docs/arn-labels.md`` for the full requirements and the ARN grammar.
 """
 from __future__ import annotations
 
-from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from solo.models import SingletonModel
 

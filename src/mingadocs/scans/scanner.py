@@ -110,8 +110,7 @@ def _looks_like_image(data: bytes) -> bool:
     if not data:
         return False
     head = data.lstrip()[:64].lower()
-    return not (head.startswith(b"<!doctype") or head.startswith(b"<html")
-                or head.startswith(b"<?xml"))
+    return not head.startswith((b"<!doctype", b"<html", b"<?xml"))
 
 
 def _run(cmd: list[str]) -> subprocess.CompletedProcess[bytes]:

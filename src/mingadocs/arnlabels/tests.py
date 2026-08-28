@@ -1,11 +1,11 @@
 from django.test import TestCase
 
+from . import services
 from .arn import Arn, continuation_page_arns, volume_page_arns
 from .enums import PageType
 from .label_templates import AVERY_L4731REV as T
 from .models import VolumeAllocation
 from .pdf import render_sheet
-from . import services
 from .services import LabelBatchInput
 
 

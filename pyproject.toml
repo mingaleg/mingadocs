@@ -28,7 +28,8 @@ dev = [
     "pylint (>=4.0.7,<5.0.0)",
     "bandit (>=1.9.4,<2.0.0)",
     "django-stubs (>=6.1.0,<7.0.0)",
-    "pylint-django (>=2.8.0,<3.0.0)"
+    "pylint-django (>=2.8.0,<3.0.0)",
+    "ruff (>=0.16.5,<0.17.0)"
 ]
 
 # --------------------------------------------------------------------------
@@ -115,3 +116,46 @@ exclude_dirs = ["src/mingadocs/tests", "tools"]
 # B101 assert: only used in tests. B404/B603: subprocess use is deliberate and
 # argument lists are fully controlled (see scans/scanner.py).
 skips = ["B101", "B404"]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+src = ["src/mingadocs"]
+# Auto-generated; mypy skips them too.
+extend-exclude = ["**/migrations/**"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",   # pycodestyle + pyflakes
+    "I",             # isort
+    "N",             # pep8-naming
+    "UP",            # pyupgrade
+    "B",             # flake8-bugbear
+    "BLE",           # flake8-blind-except
+    "C4",            # flake8-comprehensions
+    "DJ",            # flake8-django
+    "DTZ",           # flake8-datetimez
+    "EXE",           # flake8-executable
+    "G",             # flake8-logging-format
+    "ISC",           # implicit-str-concat
+    "LOG",           # flake8-logging
+    "PIE",           # flake8-pie
+    "RET",           # flake8-return
+    "RSE",           # flake8-raise
+    "SIM",           # flake8-simplify
+    "RUF",           # ruff-specific
+]
+# Security lint is bandit's job (see [tool.bandit]); do not double up here.
+
+[tool.ruff.lint.isort]
+known-first-party = ["arnlabels", "scans", "siteconfig", "config"]
+combine-as-imports = true
+
+[tool.ruff.lint.per-file-ignores]
+# Django's config-by-class-attribute style (Meta, list_display, fields, …)
+# trips RUF012 everywhere and is not a real bug there.
+"**/models.py" = ["RUF012"]
+"**/admin.py" = ["RUF012"]
+"**/forms.py" = ["RUF012"]
+# Hand-written stubs must mirror the upstream libraries' (camelCase) API.
+"stubs/**" = ["N802", "N803"]

@@ -46,7 +46,7 @@ def _task(fn: Callable[[int], None], page_id: int) -> None:
     """Wrapper: never let a worker thread die silently, always tidy up conns."""
     try:
         fn(page_id)
-    except Exception:  # noqa: BLE001
+    except Exception:
         log.exception("scan job %s failed for page %s", fn.__name__, page_id)
     finally:
         close_old_connections()
