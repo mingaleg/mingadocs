@@ -2,9 +2,14 @@
 settings page: the CUPS printer list and the SANE device list.
 
 Both shell out / open a socket and can take many seconds (network scanners
-especially). The settings page is otherwise cheap, so we probe **once per
-process** and cache the result; the user refreshes it explicitly with the
-"Rescan hardware" button. A long TTL is kept only as a safety net.
+especially). So we probe **once per process** and cache the result:
+
+* :func:`warm` runs on app boot in a background thread (see ``apps.py``), so by
+  the time anyone opens ``/settings/`` the lists are already there;
+* a cache miss still probes synchronously as a fallback;
+* the user forces a fresh probe with the "Rescan hardware" button.
+
+A long TTL is kept only as a safety net.
 """
 from __future__ import annotations
 
@@ -59,3 +64,9 @@ def cups_printers(*, refresh: bool = False) -> list[str]:
         printers = []
     cache.set(_PRINTERS_KEY, printers, _TTL)
     return printers
+
+
+def warm() -> None:
+    """Refresh both caches from a fresh probe. Safe to call from a thread."""
+    cups_printers(refresh=True)
+    sane_devices(refresh=True)

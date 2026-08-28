@@ -5,6 +5,9 @@ from django.test import TestCase
 
 from scans import scanner
 
+from . import probe
+from .apps import _should_warm_on_boot, _warm
+
 
 class SettingsPageTests(TestCase):
     def setUp(self):
@@ -49,3 +52,34 @@ class SettingsPageTests(TestCase):
                              fetch_redirect_response=False)
         self.assertRedirects(self.client.get("/labels/settings/"),
                              "/settings/#labels", fetch_redirect_response=False)
+
+    def test_boot_warm_fills_cache_so_the_page_does_not_probe(self):
+        _warm()
+        self.assertEqual(self.list_devices.call_count, 1)
+        self.assertEqual(probe.sane_devices(), ["escl:https://h:443"])
+        for _ in range(3):
+            self.client.get("/settings/")
+        self.assertEqual(self.list_devices.call_count, 1)  # still warm
+
+
+class BootWarmGuardTests(TestCase):
+    def _guard(self, argv, env):
+        with mock.patch("sys.argv", ["manage.py", *argv]), \
+                mock.patch.dict("os.environ", env, clear=False):
+            return _should_warm_on_boot()
+
+    def test_runs_for_a_server(self):
+        self.assertTrue(self._guard(["runserver"], {"RUN_MAIN": "true"}))
+
+    def test_skips_the_autoreload_parent(self):
+        self.assertFalse(self._guard(["runserver"], {"RUN_MAIN": ""}))
+
+    def test_skips_management_commands(self):
+        for cmd in ("test", "migrate", "makemigrations", "shell"):
+            self.assertFalse(self._guard([cmd], {}))
+
+    def test_env_opt_out(self):
+        self.assertFalse(self._guard(
+            ["runserver"],
+            {"RUN_MAIN": "true", "MINGADOCS_SKIP_HARDWARE_PROBE": "1"},
+        ))

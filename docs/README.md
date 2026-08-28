@@ -61,7 +61,8 @@ poetry run python src/mingadocs/manage.py runserver
 - Settings:         `/settings/` — unified page (`siteconfig` app), `#labels` +
   `#scanner` sections (also in Django admin). `/scans/settings/` and
   `/labels/settings/` redirect here. Printer / scanner lists are probed once
-  per process and cached; "Rescan hardware" forces a refresh.
+  per process and cached (warmed on app boot in a background thread);
+  "Rescan hardware" forces a refresh.
 
 Without a scanner, set `MINGADOCS_FAKE_SCANNER=/path/to/image.png` and every
 "Scan Page" returns that image.
