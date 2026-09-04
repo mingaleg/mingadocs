@@ -3,7 +3,8 @@
 {% block content %}
 <h1>Settings</h1>
 <p class="lede">Global and permanent.
-  <a href="#labels">Label printing</a> · <a href="#scanner">Scanner</a>
+  <a href="#labels">Label printing</a> · <a href="#scanner">Scanner</a> ·
+  <a href="#documents">Documents</a>
 </p>
 
 <section id="labels" class="card">
@@ -46,8 +47,60 @@
   </p>
 </section>
 
+<section id="documents" class="card">
+  <h2>Documents</h2>
+  <p>
+    {{ doc_count }} finalized document{{ doc_count|pluralize }}.
+    {% if missing_thumb_count %}
+      {{ missing_thumb_count }} missing a thumbnail.
+    {% else %}
+      All have a thumbnail.
+    {% endif %}
+  </p>
+  <div class="actions">
+    <button type="submit" form="thumbs-missing" class="btn secondary">
+      Regenerate missing thumbnails
+    </button>
+    <button type="submit" form="thumbs-all" class="btn secondary">
+      Regenerate all thumbnails
+    </button>
+  </div>
+  <p class="hint" id="thumb-regen-status"></p>
+</section>
+
 <form method="post" id="rescan-hw" hidden>
   {% csrf_token %}
   <input type="hidden" name="section" value="rescan">
 </form>
+
+<form method="post" id="thumbs-missing" action="{% url 'scans:thumbnails-regenerate' %}" hidden>
+  {% csrf_token %}
+  <input type="hidden" name="scope" value="missing">
+</form>
+<form method="post" id="thumbs-all" action="{% url 'scans:thumbnails-regenerate' %}" hidden>
+  {% csrf_token %}
+  <input type="hidden" name="scope" value="all">
+</form>
+
+<script>
+(function () {
+  var statusUrl = "{% url 'scans:thumbnails-regenerate-status' %}";
+  var el = document.getElementById("thumb-regen-status");
+  var timer = null;
+
+  function poll() {
+    fetch(statusUrl).then(function (r) { return r.json(); }).then(function (s) {
+      if (!s.running) {
+        el.textContent = "";
+        if (timer) { clearInterval(timer); timer = null; }
+        return;
+      }
+      el.textContent = "Regenerating thumbnails… " + s.processed + " / " + s.total +
+        (s.failed ? " (" + s.failed + " failed)" : "");
+      if (!timer) { timer = setInterval(poll, 1500); }
+    }).catch(function () {});
+  }
+  poll();
+})();
+</script>
 {% endblock %}

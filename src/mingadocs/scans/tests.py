@@ -253,7 +253,7 @@ class AlertTests(TestCase):
 
 @override_settings(MEDIA_ROOT=_TMP)
 class FinalizeTests(TestCase):
-    def _page(self, batch, pos, **kw):
+    def _page(self, batch, pos, *, with_thumb=True, **kw):
         buf = io.BytesIO()
         Image.new("RGB", (200, 280), "white").save(buf, format="PNG")
         from django.core.files.base import ContentFile
@@ -261,7 +261,14 @@ class FinalizeTests(TestCase):
             batch=batch, position=pos, scan_status=ScanStatus.DONE,
             ocr_status=OcrStatus.DONE, **kw,
         )
-        p.image.save(f"p{pos}.png", ContentFile(buf.getvalue()), save=True)
+        p.image.save(f"p{pos}.png", ContentFile(buf.getvalue()), save=False)
+        if with_thumb:
+            thumb_buf = io.BytesIO()
+            Image.new("RGB", (50, 70), "white").save(thumb_buf, format="JPEG")
+            p.thumbnail.save(
+                f"p{pos}-thumb.jpg", ContentFile(thumb_buf.getvalue()), save=False,
+            )
+        p.save()
         return p
 
     def test_finalize_groups_documents(self):
@@ -288,6 +295,123 @@ class FinalizeTests(TestCase):
         with self.assertRaises(ValueError):
             services.finalize_batch(b)
 
+    def test_finalize_copies_first_page_thumbnail(self):
+        b = services.start_batch()
+        services.stop_batch(b)
+        first = self._page(b, 10, detected_arn="ARN202600001")
+        self._page(b, 20, manual_continuation=True)
+        expected = first.thumbnail.read()
+
+        docs = services.finalize_batch(b)
+        self.assertEqual(len(docs), 1)
+        self.assertTrue(docs[0].thumbnail)
+        self.assertEqual(docs[0].thumbnail.read(), expected)
+
+    def test_finalize_without_a_first_page_thumbnail_leaves_it_blank(self):
+        b = services.start_batch()
+        services.stop_batch(b)
+        self._page(b, 10, detected_arn="ARN202600001", with_thumb=False)
+
+        docs = services.finalize_batch(b)
+        self.assertFalse(docs[0].thumbnail)
+
+
+@override_settings(MEDIA_ROOT=_TMP)
+class ThumbnailRegenTests(TestCase):
+    """`jobs.enqueue_thumbnail_regen` and the settings-page endpoints."""
+
+    def setUp(self):
+        # Module-level job state outlives any one test's DB transaction.
+        self.addCleanup(self._reset_thumb_state)
+
+    def _reset_thumb_state(self):
+        with jobs._thumb_lock:
+            jobs._thumb_state.running = False
+            jobs._thumb_state.processed = 0
+            jobs._thumb_state.failed = 0
+            jobs._thumb_state.total = 0
+
+    def _finalized_doc(self, *, with_thumb=True):
+        b = services.start_batch()
+        services.stop_batch(b)
+        buf = io.BytesIO()
+        Image.new("RGB", (200, 280), "white").save(buf, format="PNG")
+        from django.core.files.base import ContentFile
+        p = ScanPage.objects.create(
+            batch=b, position=10, scan_status=ScanStatus.DONE,
+            ocr_status=OcrStatus.DONE, detected_arn=f"ARN2026{b.id:05d}",
+        )
+        p.image.save("p.png", ContentFile(buf.getvalue()), save=False)
+        if with_thumb:
+            thumb_buf = io.BytesIO()
+            Image.new("RGB", (50, 70), "white").save(thumb_buf, format="JPEG")
+            p.thumbnail.save(
+                "p-thumb.jpg", ContentFile(thumb_buf.getvalue()), save=False,
+            )
+        p.save()
+        return services.finalize_batch(b)[0]
+
+    def test_regenerate_one_thumbnail_builds_a_real_jpeg(self):
+        doc = self._finalized_doc(with_thumb=False)
+        self.assertFalse(doc.thumbnail)
+
+        self.assertTrue(jobs._regenerate_one_thumbnail(doc.id))
+
+        doc.refresh_from_db()
+        self.assertTrue(doc.thumbnail)
+        self.assertTrue(doc.thumbnail.read().startswith(b"\xff\xd8"))
+
+    def test_regenerate_one_thumbnail_without_a_pdf_fails_gracefully(self):
+        doc = Document.objects.create(start_arn="ARN202699999", page_count=1)
+        self.assertFalse(jobs._regenerate_one_thumbnail(doc.id))
+
+    def test_run_thumbnail_regen_only_missing_skips_existing(self):
+        already_has = self._finalized_doc(with_thumb=True)
+        was_missing = self._finalized_doc(with_thumb=False)
+        original = already_has.thumbnail.read()
+
+        jobs._run_thumbnail_regen(only_missing=True)
+
+        status = jobs.thumbnail_regen_status()
+        self.assertEqual(
+            (status.running, status.total, status.processed, status.failed),
+            (False, 1, 1, 0),
+        )
+        already_has.refresh_from_db()
+        was_missing.refresh_from_db()
+        self.assertEqual(already_has.thumbnail.read(), original)
+        self.assertTrue(was_missing.thumbnail)
+
+    def test_enqueue_thumbnail_regen_rejects_concurrent_runs(self):
+        with mock.patch.object(jobs._THUMB_POOL, "submit"):
+            self.assertTrue(jobs.enqueue_thumbnail_regen(only_missing=True))
+            self.assertFalse(jobs.enqueue_thumbnail_regen(only_missing=True))
+
+    def test_regenerate_view_starts_a_pass(self):
+        with mock.patch.object(
+            jobs, "enqueue_thumbnail_regen", return_value=True
+        ) as enqueue:
+            r = self.client.post(
+                "/scans/documents/thumbnails/regenerate/", {"scope": "all"}
+            )
+        enqueue.assert_called_once_with(only_missing=False)
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r["Location"], "/settings/#documents")
+
+    def test_regenerate_view_reports_already_running(self):
+        with mock.patch.object(jobs, "enqueue_thumbnail_regen", return_value=False):
+            r = self.client.post(
+                "/scans/documents/thumbnails/regenerate/", {"scope": "missing"}
+            )
+        self.assertEqual(r.status_code, 302)
+
+    def test_regenerate_status_endpoint_shape(self):
+        r = self.client.get("/scans/documents/thumbnails/regenerate/status/")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(
+            set(r.json()), {"running", "processed", "failed", "total"}
+        )
+
 
 @override_settings(MEDIA_ROOT=_TMP)
 class ViewTests(TestCase):
@@ -312,6 +436,44 @@ class ViewTests(TestCase):
         r = self.client.get("/scans/documents/")
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "ARN 2026 00 042")
+
+    def test_document_list_thumbnail_view_paginates_5x10(self):
+        from django.core.files.base import ContentFile
+
+        for i in range(120):
+            doc = Document.objects.create(
+                start_arn=f"ARN{i:09d}", page_count=1,
+            )
+            buf = io.BytesIO()
+            Image.new("RGB", (50, 70), "white").save(buf, format="JPEG")
+            doc.thumbnail.save(
+                f"{doc.start_arn}-thumb.jpg", ContentFile(buf.getvalue()), save=True,
+            )
+
+        r = self.client.get("/scans/documents/?view=thumbnails")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context["page_obj"].paginator.num_pages, 3)
+        self.assertEqual(len(r.context["page_obj"]), 50)
+
+    def test_document_thumb_urls_endpoint(self):
+        from django.core.files.base import ContentFile
+
+        for i in range(3):
+            doc = Document.objects.create(
+                start_arn=f"ARN{i:09d}", page_count=1,
+            )
+            buf = io.BytesIO()
+            Image.new("RGB", (50, 70), "white").save(buf, format="JPEG")
+            doc.thumbnail.save(
+                f"{doc.start_arn}-thumb.jpg", ContentFile(buf.getvalue()), save=True,
+            )
+
+        r = self.client.get("/scans/documents/thumbnails/1/")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(r.json()["urls"]), 3)
+
+        r = self.client.get("/scans/documents/thumbnails/2/")
+        self.assertEqual(r.json()["urls"], [])
 
     def test_review_redirects_while_scanning(self):
         b = services.start_batch()

@@ -69,3 +69,18 @@ class ReorderRequest(BaseModel):
     model_config = _FROZEN
 
     ids: list[int]
+
+
+class DocumentThumbUrls(BaseModel):
+    model_config = _FROZEN
+
+    urls: list[str]
+
+
+class ThumbnailRegenState(BaseModel):
+    model_config = _FROZEN
+
+    running: bool
+    processed: int
+    failed: int
+    total: int

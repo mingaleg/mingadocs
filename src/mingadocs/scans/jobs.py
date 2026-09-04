@@ -1,21 +1,30 @@
-"""In-process background workers for scanning and OCR.
+"""In-process background workers for scanning, OCR and thumbnail regen.
 
 The physical scanner is a serial resource, so scans run one at a time
 (``_SCAN_POOL`` has a single worker). OCR is CPU-bound image work and runs in a
-small separate pool so a slow decode never blocks the next scan.
+small separate pool so a slow decode never blocks the next scan. Thumbnail
+regeneration (``_THUMB_POOL``) is a third, independent single-worker pool: a
+bulk pass over every ``Document`` triggered from the settings page, unrelated
+to live scanning.
 
-Job state is persisted on ``ScanPage`` rows; nothing here needs a broker. On
-process restart :func:`recover_stale` marks interrupted work as failed so the
-UI unblocks (a half-scanned page is never silently re-scanned).
+Job state for scan/OCR is persisted on ``ScanPage`` rows; nothing here needs a
+broker. On process restart :func:`recover_stale` marks interrupted work as
+failed so the UI unblocks (a half-scanned page is never silently re-scanned).
+Thumbnail-regen progress is transient, in-memory only (see
+:class:`ThumbnailRegenStatus`) — a restart mid-pass just means running it
+again.
 """
 from __future__ import annotations
 
+import dataclasses
 import io
 import logging
+import threading
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 from typing import Final
 
+import pypdfium2 as pdfium
 from django.core.files.base import ContentFile
 from django.db import close_old_connections
 from PIL import Image
@@ -24,12 +33,13 @@ from arnlabels.models import PrintSettings
 
 from . import ocr, scanner
 from .enums import BatchStatus, OcrStatus, ScanStatus
-from .models import ScanPage, ScanSettings
+from .models import Document, ScanPage, ScanSettings
 
 log = logging.getLogger("scans")
 
 _SCAN_POOL = ThreadPoolExecutor(max_workers=1, thread_name_prefix="scan")
 _OCR_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="ocr")
+_THUMB_POOL = ThreadPoolExecutor(max_workers=1, thread_name_prefix="thumb-regen")
 
 THUMB_WIDTH: Final = 320
 
@@ -52,6 +62,14 @@ def _task(fn: Callable[[int], None], page_id: int) -> None:
         close_old_connections()
 
 
+def _make_thumbnail_jpeg(im: Image.Image) -> bytes:
+    thumb = im.convert("RGB")
+    thumb.thumbnail((THUMB_WIDTH, THUMB_WIDTH * 4))
+    buf = io.BytesIO()
+    thumb.save(buf, format="JPEG", quality=80)
+    return buf.getvalue()
+
+
 def _run_scan(page_id: int) -> None:
     page = ScanPage.objects.select_related("batch").get(pk=page_id)
     cfg = ScanSettings.get_solo()
@@ -68,14 +86,11 @@ def _run_scan(page_id: int) -> None:
     with Image.open(io.BytesIO(image_bytes)) as im:
         im.load()
         width, height = im.size
-        thumb = im.convert("RGB")
-        thumb.thumbnail((THUMB_WIDTH, THUMB_WIDTH * 4))
-        thumb_buf = io.BytesIO()
-        thumb.save(thumb_buf, format="JPEG", quality=80)
+        thumb_bytes = _make_thumbnail_jpeg(im)
 
     page.image.save(f"page-{page_id}.png", ContentFile(image_bytes), save=False)
     page.thumbnail.save(
-        f"page-{page_id}-thumb.jpg", ContentFile(thumb_buf.getvalue()), save=False
+        f"page-{page_id}-thumb.jpg", ContentFile(thumb_bytes), save=False
     )
     page.width = width
     page.height = height
@@ -141,3 +156,90 @@ def recover_stale() -> None:
     if pending or running:
         log.info("recover_stale: %s pending scans, %s running OCR reset",
                  pending, running)
+
+
+# --- document thumbnail regeneration ----------------------------------------
+
+@dataclasses.dataclass(frozen=True)
+class ThumbnailRegenStatus:
+    running: bool
+    processed: int
+    failed: int
+    total: int
+
+
+@dataclasses.dataclass
+class _ThumbRegenState:
+    running: bool = False
+    processed: int = 0
+    failed: int = 0
+    total: int = 0
+
+
+_thumb_lock = threading.Lock()
+_thumb_state = _ThumbRegenState()
+
+
+def thumbnail_regen_status() -> ThumbnailRegenStatus:
+    with _thumb_lock:
+        return ThumbnailRegenStatus(
+            running=_thumb_state.running, processed=_thumb_state.processed,
+            failed=_thumb_state.failed, total=_thumb_state.total,
+        )
+
+
+def enqueue_thumbnail_regen(*, only_missing: bool) -> bool:
+    """Start a background pass rebuilding ``Document`` thumbnails from their PDF.
+
+    Returns ``False`` (no-op) if a pass is already running.
+    """
+    with _thumb_lock:
+        if _thumb_state.running:
+            return False
+        _thumb_state.running = True
+        _thumb_state.processed = 0
+        _thumb_state.failed = 0
+        _thumb_state.total = 0
+    _THUMB_POOL.submit(_run_thumbnail_regen, only_missing)
+    return True
+
+
+def _run_thumbnail_regen(only_missing: bool) -> None:
+    try:
+        docs = Document.objects.all()
+        if only_missing:
+            docs = docs.filter(thumbnail="")
+        ids = list(docs.values_list("id", flat=True))
+        with _thumb_lock:
+            _thumb_state.total = len(ids)
+        for doc_id in ids:
+            ok = _regenerate_one_thumbnail(doc_id)
+            with _thumb_lock:
+                _thumb_state.processed += 1
+                if not ok:
+                    _thumb_state.failed += 1
+    except Exception:
+        log.exception("thumbnail regeneration pass failed")
+    finally:
+        with _thumb_lock:
+            _thumb_state.running = False
+        close_old_connections()
+
+
+def _regenerate_one_thumbnail(doc_id: int) -> bool:
+    try:
+        doc = Document.objects.get(pk=doc_id)
+        if not doc.pdf:
+            return False
+        with doc.pdf.open("rb") as fh:
+            pdf_bytes = fh.read()
+        first_page = pdfium.PdfDocument(pdf_bytes)[0]
+        thumb_bytes = _make_thumbnail_jpeg(first_page.render(scale=1).to_pil())
+        doc.thumbnail.delete(save=False)
+        doc.thumbnail.save(
+            f"{doc.start_arn}-thumb.jpg", ContentFile(thumb_bytes), save=True,
+        )
+        return True
+    except Exception:
+        log.exception("failed to regenerate thumbnail for document %s", doc_id)
+        return False

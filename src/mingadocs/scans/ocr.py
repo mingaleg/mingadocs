@@ -29,7 +29,10 @@ def detect_arn(image_bytes: bytes, prefix: str) -> OcrResult:
     """
     img = Image.open(io.BytesIO(image_bytes))
     img.load()
-    matches = sorted(_scan_code128(img, prefix))
+    # Grayscale before tiling/upscaling: zxing-cpp binarizes on luminance anyway,
+    # so converting once up front (instead of per binarizer call, on data that's
+    # about to be blown up 16x by the 4x upscale) is a large, free speedup.
+    matches = sorted(_scan_code128(img.convert("L"), prefix))
     if len(matches) == 1:
         return OcrResult(
             outcome=OcrOutcome.FOUND, arn=matches[0], note="",
@@ -65,6 +68,16 @@ _TILES_X = 2
 _TILES_Y = 3
 _TILE_OVERLAP = 0.12
 
+# A label-sized Code 128 on a full-resolution flatbed scan often has too few
+# pixels per module for zxing-cpp to binarize reliably at native resolution --
+# it can come back empty, or (worse) silently misread a digit into a
+# different but still checksum-valid Code 128. A smoothing 4x upscale
+# consistently reads it correctly, so every region is scanned only at that
+# enlargement -- native resolution is never scanned directly, and smaller
+# upscales are avoided too: they sit in the same unreliable regime and can
+# produce a spurious second (mis-)reading that makes a clean page ambiguous.
+_UPSCALE_FACTOR = 4
+
 
 def _regions(img: Image.Image) -> Iterator[Image.Image]:
     yield img
@@ -84,10 +97,14 @@ def _regions(img: Image.Image) -> Iterator[Image.Image]:
 def _scan_code128(img: Image.Image, prefix: str) -> set[str]:
     found: set[str] = set()
     for region in _regions(img):
+        upscaled = region.resize(
+            (region.width * _UPSCALE_FACTOR, region.height * _UPSCALE_FACTOR),
+            Image.Resampling.BICUBIC,
+        )
         for binarizer in _BINARIZERS:
             try:
                 results = zxingcpp.read_barcodes(
-                    region,
+                    upscaled,
                     formats=_CODE128,
                     binarizer=binarizer,
                 )

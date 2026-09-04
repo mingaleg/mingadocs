@@ -3,29 +3,113 @@
 {% block content %}
 <h1>Documents</h1>
 <p class="lede">
-  Every finalized document, newest first. {{ documents|length }} total.
+  Every finalized document, newest first.
+  {% if view == "thumbnails" %}{{ page_obj.paginator.count }}{% else %}{{ documents|length }}{% endif %}
+  total.
 </p>
 
-<div class="card">
-  {% if documents %}
-    <table class="data">
-      <thead>
-        <tr><th>ARN</th><th>Pages</th><th>Created</th><th>Batch</th><th>PDF</th></tr>
-      </thead>
-      <tbody>
-      {% for doc in documents %}
-        <tr>
-          <td>{{ doc.human_start_arn }}</td>
-          <td>{{ doc.page_count }}</td>
-          <td>{{ doc.created_at|date:"Y-m-d H:i" }}</td>
-          <td>{% if doc.batch_id %}#{{ doc.batch_id }}{% else %}—{% endif %}</td>
-          <td>{% if doc.pdf %}<a href="{{ doc.pdf.url }}" target="_blank">open</a>{% endif %}</td>
-        </tr>
+<div class="tabs" role="tablist">
+  <a class="tab{% if view == "list" %} active{% endif %}" href="?view=list">List</a>
+  <a class="tab{% if view == "thumbnails" %} active{% endif %}" href="?view=thumbnails">Thumbnails</a>
+</div>
+
+{% if view == "thumbnails" %}
+  {% if page_obj.paginator.count %}
+    <div class="thumb-grid cols-5" id="thumb-grid">
+      {% for doc in page_obj %}
+        {% if doc.thumbnail %}
+          <a class="thumb" {% if doc.pdf %}href="{{ doc.pdf.url }}" target="_blank"{% endif %}>
+            <img src="{{ doc.thumbnail.url }}" alt="{{ doc.human_start_arn }}">
+            {% if doc.page_count > 1 %}
+              <span class="thumb-badge">{{ doc.page_count }}</span>
+            {% endif %}
+            <div class="thumb-meta">
+              <div class="thumb-arn">{{ doc.human_start_arn }}</div>
+            </div>
+          </a>
+        {% else %}
+          <a class="thumb placeholder" {% if doc.pdf %}href="{{ doc.pdf.url }}" target="_blank"{% endif %}>
+            {{ doc.human_start_arn }} — no thumbnail
+          </a>
+        {% endif %}
       {% endfor %}
-      </tbody>
-    </table>
+    </div>
+
+    <nav class="pager">
+      {% if page_obj.has_previous %}
+        <a href="?view=thumbnails&page={{ page_obj.previous_page_number }}">← Prev</a>
+      {% endif %}
+      <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+        <a href="?view=thumbnails&page={{ page_obj.next_page_number }}">Next →</a>
+      {% endif %}
+    </nav>
+
+    {% if page_obj.has_next %}
+    <script>
+    (function () {
+      var imgs = document.querySelectorAll("#thumb-grid img");
+      var pending = imgs.length;
+      function prefetchNextPage() {
+        fetch("{% url 'scans:document-thumb-urls' page_obj.next_page_number %}")
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            (data.urls || []).forEach(function (url) {
+              var warm = new Image();
+              warm.src = url;
+            });
+          })
+          .catch(function () {});
+      }
+      if (!pending) {
+        prefetchNextPage();
+        return;
+      }
+      imgs.forEach(function (img) {
+        if (img.complete) {
+          pending -= 1;
+        } else {
+          img.addEventListener("load", onSettle);
+          img.addEventListener("error", onSettle);
+        }
+      });
+      if (pending <= 0) {
+        prefetchNextPage();
+      }
+      function onSettle() {
+        pending -= 1;
+        if (pending <= 0) {
+          prefetchNextPage();
+        }
+      }
+    })();
+    </script>
+    {% endif %}
   {% else %}
     <p class="empty">No documents yet.</p>
   {% endif %}
-</div>
+{% else %}
+  <div class="card">
+    {% if documents %}
+      <table class="data">
+        <thead>
+          <tr><th>ARN</th><th>Pages</th><th>Created</th><th>Batch</th><th>PDF</th></tr>
+        </thead>
+        <tbody>
+        {% for doc in documents %}
+          <tr>
+            <td>{{ doc.human_start_arn }}</td>
+            <td>{{ doc.page_count }}</td>
+            <td>{{ doc.created_at|date:"Y-m-d H:i" }}</td>
+            <td>{% if doc.batch_id %}#{{ doc.batch_id }}{% else %}—{% endif %}</td>
+            <td>{% if doc.pdf %}<a href="{{ doc.pdf.url }}" target="_blank">open</a>{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="empty">No documents yet.</p>
+    {% endif %}
+  </div>
+{% endif %}
 {% endblock %}

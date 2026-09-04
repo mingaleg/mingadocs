@@ -143,6 +143,11 @@ class Document(models.Model):
     start_arn = models.CharField(max_length=64)
     page_count = models.PositiveIntegerField()
     pdf = models.FileField(upload_to="documents/%Y/%m/")
+    thumbnail = models.FileField(
+        upload_to="documents/%Y/%m/", blank=True,
+        help_text="Pre-rendered from the first page, for the document list's "
+                  "thumbnail view.",
+    )
     batch = models.ForeignKey(
         ScanBatch, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="documents",

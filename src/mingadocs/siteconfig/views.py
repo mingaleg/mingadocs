@@ -17,7 +17,7 @@ from django.urls import reverse
 from arnlabels.forms import PrintSettingsForm
 from arnlabels.models import PrintSettings
 from scans.forms import ScanSettingsForm
-from scans.models import ScanSettings
+from scans.models import Document, ScanSettings
 
 from . import probe
 
@@ -78,4 +78,6 @@ def settings_page(request: HttpRequest) -> HttpResponse:
         "nav": "settings",
         "print_form": print_form, "printers": printers,
         "scan_form": scan_form, "devices": devices,
+        "doc_count": Document.objects.count(),
+        "missing_thumb_count": Document.objects.filter(thumbnail="").count(),
     })

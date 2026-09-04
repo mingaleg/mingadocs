@@ -13,7 +13,8 @@ Implemented in the `scans` Django app.
   detected / manually-set ARN.
 - **Document** (`Document`) — a finalized multi-page PDF: a volume-start ARN
   page followed by its continuation pages. `GET /scans/documents/` lists them
-  all (ARN, page count, date, source batch, PDF link).
+  all (ARN, page count, date, source batch, PDF link), with a `?view=thumbnails`
+  grid view — see below.
 
 ## Batch states
 
@@ -65,6 +66,15 @@ reasons: the default `LocalAverage` binarizer sometimes misses a crisp barcode
 that a fixed threshold reads cleanly, and this build of zxing-cpp stops after
 the first symbol it finds — on a page that also carries a Data Matrix the small
 ARN Code 128 is otherwise never located in the full image.
+
+Every region is scanned only after a 4× bicubic upscale, never at native
+resolution: a label-sized Code 128 on a full-resolution flatbed scan often has
+too few pixels per module for zxing-cpp to binarize reliably at native size —
+it can come back empty, or (worse) silently misread a digit into a different
+but still checksum-valid code. Smaller upscales (e.g. 2×) sit in the same
+unreliable regime and were dropped after one produced exactly that kind of
+misread on a real scan. See `make test-with-actual-docs` below for the
+regression suite this was tuned against.
 
 ### Restart recovery
 
@@ -122,9 +132,51 @@ pages and no alerts.
 2. Walk pages in `position` order: each volume-start ARN opens a new document
    group; continuation pages append to the current group.
 3. Per group: build a PDF from the page images (`Pillow`, `save_all`), create a
-   `Document(start_arn, page_count, pdf, batch)`.
+   `Document(start_arn, page_count, pdf, batch)`. `Document.thumbnail` is a
+   copy of the first page's own `ScanPage.thumbnail` file (already the right
+   size — no re-render), left blank if that page never got one.
 4. Delete every scan image + thumbnail file and all `ScanPage` rows.
 5. `batch.status = finalized`.
+
+## Document list — thumbnail view
+
+`GET /scans/documents/?view=thumbnails` shows a 5×10 grid of `Document`
+thumbnails (`views.THUMB_PAGE_SIZE = 50`), paginated with Django's
+`Paginator`; `?view=list` (the default) is the original table. Each cell
+links to the document's PDF; a document finalized before this field existed,
+or whose first page had no thumbnail, renders as a `.thumb.placeholder` cell
+with just its ARN.
+
+Once every `<img>` on the current page has loaded (or failed), an inline
+script fetches `GET /scans/documents/thumbnails/<page>/`
+(`views.document_thumb_urls`, → `DocumentThumbUrls.urls`) for the *next*
+page and warms the browser cache for those URLs with throwaway `Image()`
+objects — so paging forward is instant once the current page is done
+loading. It does nothing on the last page (no next page to prefetch) and
+never blocks rendering of the current page.
+
+### Regenerating thumbnails
+
+The **Documents** section of `/settings/` (`siteconfig/settings.html`) has
+two buttons, "Regenerate missing thumbnails" and "Regenerate all thumbnails",
+posting to `POST /scans/documents/thumbnails/regenerate/`
+(`scope=missing` / `scope=all`). Like scanning and OCR, this runs in its own
+single-worker background pool (`jobs._THUMB_POOL`) so the request returns
+immediately; an inline script on the settings page polls
+`GET /scans/documents/thumbnails/regenerate/status/`
+(`jobs.thumbnail_regen_status` → `ThumbnailRegenState`) every 1.5 s while a
+pass is running and shows "processed / total (N failed)".
+
+`jobs.enqueue_thumbnail_regen` is a no-op (returns `False`, flashes "already
+running") if a pass is already in flight — there's no queueing, just the one
+worker. `jobs._regenerate_one_thumbnail` rebuilds a `Document`'s thumbnail
+from its own `pdf` file: renders page 1 with `pypdfium2`, reuses the same
+`_make_thumbnail_jpeg` helper `_run_scan` uses for `ScanPage.thumbnail`
+(`THUMB_WIDTH = 320`, JPEG quality 80), replaces the old thumbnail file if
+any. A per-document failure is logged and counted, not raised — one bad PDF
+doesn't stop the pass. Progress (`running` / `processed` / `failed` /
+`total`) is in-memory only, not persisted: a server restart mid-pass just
+means running it again.
 
 ## Scanner backend
 
@@ -152,14 +204,21 @@ pages and no alerts.
 
 `ScanSettings` singleton — edited in the **Scanner** section of the unified
 settings page, which lives in its own tiny app: `siteconfig` serves
-`/settings/` (`#scanner` / `#labels` sections). It has no models of its own —
-it just edits `arnlabels.PrintSettings` and `scans.ScanSettings`. Old links
+`/settings/` (`#scanner` / `#labels` / `#documents` sections). It has no
+models of its own — it just edits `arnlabels.PrintSettings` and
+`scans.ScanSettings`, and (for `#documents`) reads `scans.Document` counts
+and posts to the `scans:thumbnails-regenerate` endpoints above. Old links
 (`/scans/settings/`, `/labels/settings/`) redirect there. Also in the Django
 admin.
 
 The CUPS printer list and the SANE device list are slow external probes, so
 `siteconfig.probe` runs each **once per process** and caches the result (1 h
-safety TTL); the **Rescan hardware** button on the page forces a refresh.
+safety TTL). `SiteconfigConfig.ready()` **warms that cache on boot** in a daemon
+thread (`siteconfig.probe.warm`), so the first `/settings/` visit is instant;
+a cache miss still probes synchronously as a fallback, and the **Rescan
+hardware** button forces a refresh. The boot probe is skipped for management
+commands (`test`, `migrate`, …), for the `runserver` autoreload parent, and
+when `MINGADOCS_SKIP_HARDWARE_PROBE` is set.
 
 | Field                 | Default | Purpose |
 |-----------------------|---------|---------|
@@ -184,10 +243,35 @@ The ARN **prefix** is shared with label printing (`arnlabels.PrintSettings`).
 | `scans/views.py`     | Console, review, page detail, document list, JSON endpoints — every payload is a `scans/schemas.py` model |
 | `scans/forms.py`     | `ScanSettingsForm`, `PageArnForm` (exposes `arn_mode()` / `arn_value()`) |
 | `scans/templates/scans/` | 5 templates, extend `arnlabels/base.html` |
+| `scans/test_actual_docs.py` | OCR regression suite against real scans in `media/documents/` — see below |
 | `siteconfig/`        | The `/settings/` page (view + `probe.py` hardware cache); no models |
 
 Shared CSS lives in `arnlabels/static/arnlabels/app.css` (`.thumb-grid`,
 `.modal`, `.alert-list`, …).
+
+## Real-document OCR regression suite
+
+`scans/test_actual_docs.py` re-runs `ocr.detect_arn` over every page of every
+PDF under `media/documents/**/*.pdf`: page 1 of each document must decode to
+the ARN encoded in its own filename (`<prefix><body>.pdf`, the name
+`services._pages_to_pdf` writes), every later page must decode to the
+continuation marker (`PREFIX 000000000`).
+
+That folder holds real scans and is gitignored (`media/`), so this is never
+part of `make test` or CI — it only makes sense on a workstation that has the
+documents. Run it with:
+
+- `make test-with-actual-docs` — full run over every page; this is the
+  authoritative check and rewrites `.test_actual_docs_failures.json` (under
+  `MEDIA_ROOT`) with whatever still fails.
+- `make test-with-actual-docs-failed` — re-tests only the `(doc, page)` pairs
+  recorded in that file, for a fast inner loop while chasing a detection fix.
+  Falls back to skipping with a clear message if nothing has been recorded
+  yet (run the full target first).
+
+Rendering a page back out of the finished PDF (rather than from the original
+scan bytes) needs the optional `actual-docs-test` poetry group (`pypdfium2`),
+installed automatically by both targets.
 
 ## Open questions / future
 

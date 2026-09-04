@@ -9,6 +9,12 @@ urlpatterns = [
     path("", views.batch_list, name="batch-list"),
     path("new/", views.new_batch, name="new-batch"),
     path("documents/", views.document_list, name="document-list"),
+    path("documents/thumbnails/regenerate/", views.thumbnails_regenerate,
+         name="thumbnails-regenerate"),
+    path("documents/thumbnails/regenerate/status/",
+         views.thumbnails_regenerate_status, name="thumbnails-regenerate-status"),
+    path("documents/thumbnails/<int:page>/", views.document_thumb_urls,
+         name="document-thumb-urls"),
     # Settings moved to their own module at /settings/; keep old links working.
     path("settings/", RedirectView.as_view(url="/settings/", query_string=True)),
     path("<int:batch_id>/", views.batch_console, name="console"),

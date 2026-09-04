@@ -204,13 +204,18 @@ def finalize_batch(batch: ScanBatch) -> list[Document]:
     documents: list[Document] = []
     for group in groups:
         pdf_bytes = _pages_to_pdf(group.pages)
+        start = group.start.barcode_value()
         doc = Document.objects.create(
-            start_arn=group.start.barcode_value(),
-            page_count=len(group.pages),
-            batch=batch,
+            start_arn=start, page_count=len(group.pages), batch=batch,
         )
-        doc.pdf.save(f"{group.start.barcode_value()}.pdf",
-                     ContentFile(pdf_bytes), save=True)
+        doc.pdf.save(f"{start}.pdf", ContentFile(pdf_bytes), save=False)
+        first_thumb = group.pages[0].thumbnail
+        if first_thumb:
+            with first_thumb.open("rb") as fh:
+                doc.thumbnail.save(
+                    f"{start}-thumb.jpg", ContentFile(fh.read()), save=False,
+                )
+        doc.save()
         documents.append(doc)
 
     for page in pages:

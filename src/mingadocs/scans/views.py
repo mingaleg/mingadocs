@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from django.contrib import messages
+from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -16,20 +17,24 @@ from pydantic import ValidationError
 
 from arnlabels.models import PrintSettings
 
-from . import services
+from . import jobs, services
 from .enums import BatchStatus
 from .forms import PageArnForm
 from .models import Document, ScanBatch, ScanPage
 from .schemas import (
     AlertState,
     BatchState,
+    DocumentThumbUrls,
     PageArnResponse,
     PageState,
     ReorderRequest,
     ScanPageStarted,
+    ThumbnailRegenState,
 )
 
 _XHR: Final = "XMLHttpRequest"
+# 5 columns x 10 rows.
+THUMB_PAGE_SIZE: Final = 50
 
 
 def _page_state(page: ScanPage, arn_label: str | None = None) -> PageState:
@@ -101,9 +106,50 @@ def batch_list(request: HttpRequest) -> HttpResponse:
 
 
 def document_list(request: HttpRequest) -> HttpResponse:
+    view = "thumbnails" if request.GET.get("view") == "thumbnails" else "list"
+    if view == "thumbnails":
+        paginator = Paginator(Document.objects.all(), THUMB_PAGE_SIZE)
+        page_obj = paginator.get_page(request.GET.get("page"))
+        return render(request, "scans/document_list.html", {
+            "nav": "documents", "view": view, "page_obj": page_obj,
+        })
     return render(request, "scans/document_list.html", {
-        "nav": "documents", "documents": Document.objects.all(),
+        "nav": "documents", "view": view, "documents": Document.objects.all(),
     })
+
+
+def document_thumb_urls(request: HttpRequest, page: int) -> HttpResponse:
+    """Thumbnail URLs for one page of the grid, for the next-page prefetch."""
+    paginator = Paginator(Document.objects.all(), THUMB_PAGE_SIZE)
+    urls = (
+        [d.thumbnail.url for d in paginator.page(page).object_list if d.thumbnail]
+        if 1 <= page <= paginator.num_pages
+        else []
+    )
+    return JsonResponse(DocumentThumbUrls(urls=urls).model_dump(mode="json"))
+
+
+@require_POST
+def thumbnails_regenerate(request: HttpRequest) -> HttpResponse:
+    """Kick off a background pass rebuilding Document thumbnails from their PDF.
+
+    Posted from the settings page; see ``jobs.enqueue_thumbnail_regen``.
+    """
+    only_missing = request.POST.get("scope") != "all"
+    if jobs.enqueue_thumbnail_regen(only_missing=only_missing):
+        messages.success(request, "Regenerating document thumbnails…")
+    else:
+        messages.info(request, "A thumbnail regeneration pass is already running.")
+    return redirect(reverse("siteconfig:settings") + "#documents")
+
+
+def thumbnails_regenerate_status(request: HttpRequest) -> HttpResponse:
+    status = jobs.thumbnail_regen_status()
+    state = ThumbnailRegenState(
+        running=status.running, processed=status.processed,
+        failed=status.failed, total=status.total,
+    )
+    return JsonResponse(state.model_dump(mode="json"))
 
 
 @require_POST
