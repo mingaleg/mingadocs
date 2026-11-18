@@ -20,7 +20,7 @@ Future work: storage/retention, electronic-document intake, search, auth.
 
 ## Tech stack
 
-- Python ≥ 3.14, managed with Poetry
+- Python ≥ 3.14, managed with uv (`uv.lock`)
 - Django 6.x
 - SQLite (development)
 - `reportlab` for PDF generation
@@ -42,14 +42,15 @@ src/mingadocs/
   siteconfig/        The unified /settings/ page (no models)
 media/               Uploaded scan images + generated document PDFs (gitignored)
 docs/                Requirements and context (this directory)
+nix/                 Package, NixOS module and VM test (see Deployment)
 ```
 
 Run the dev server:
 
 ```
-poetry install
-poetry run python src/mingadocs/manage.py migrate
-poetry run python src/mingadocs/manage.py runserver
+make install   # uv sync
+make migrate
+make run
 ```
 
 - Overview:        `/` — current configuration plus live islands for scan
@@ -69,6 +70,38 @@ Without a scanner, set `MINGADOCS_FAKE_SCANNER=/path/to/image.png` and every
 
 Templates extend `arnlabels/base.html`; styling is one stylesheet at
 `arnlabels/static/arnlabels/app.css` (light/dark aware, no build step).
+
+## Deployment
+
+The repository is a Nix flake. `packages.default` is built from `uv.lock` with
+uv2nix (so production runs exactly the locked versions) and `collectstatic`
+runs at build time. `nixosModules.default` provides `services.mingadocs`:
+
+```nix
+services.mingadocs = {
+  enable = true;
+  mediaDir = "/mnt/disk/mingadocs";        # scans + PDFs; the SQLite DB stays in /var/lib/mingadocs
+  allowedHosts = [ "docs.example.lan" ];
+  secretKeyFile = "/run/agenix/mingadocs-secret-key";
+};
+```
+
+It runs gunicorn on `127.0.0.1:8095` with a single worker process (scan, OCR
+and hardware-probe jobs are threads inside it), applies migrations on start,
+and won't start while `mediaDir`'s file system isn't mounted. The app has **no
+login**: put it behind a web server that restricts who can reach it, and that
+also serves `services.mingadocs.staticDir` at `/static/` and `mediaDir` at
+`/media/` (with `DEBUG` off the app serves neither). Printing needs a CUPS
+queue on the host; scanning uses SANE's `scanimage`, which the service has on
+its `PATH`.
+
+Settings come from the environment, all optional in development:
+`MINGADOCS_DEBUG` (`0` in production), `MINGADOCS_SECRET_KEY_FILE` /
+`DJANGO_SECRET_KEY`, `MINGADOCS_ALLOWED_HOSTS` (comma-separated),
+`MINGADOCS_MEDIA_ROOT`, `MINGADOCS_DB_PATH`, `MINGADOCS_STATIC_ROOT`.
+
+`nix flake check` builds the package, runs the unit tests against it with
+`DEBUG` off, and boots the module in a NixOS VM test (`nix/vm-test.nix`).
 
 ## Static analysis
 

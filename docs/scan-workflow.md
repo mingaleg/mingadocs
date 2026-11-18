@@ -270,8 +270,7 @@ documents. Run it with:
   yet (run the full target first).
 
 Rendering a page back out of the finished PDF (rather than from the original
-scan bytes) needs the optional `actual-docs-test` poetry group (`pypdfium2`),
-installed automatically by both targets.
+scan bytes) uses `pypdfium2`, a regular dependency.
 
 ## Open questions / future
 
