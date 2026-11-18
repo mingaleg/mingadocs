@@ -21,8 +21,10 @@ shell:
 superuser:
 	uv run python manage.py createsuperuser
 
+# Apps named explicitly: discovery from the repo root only sees the empty
+# top-level tests/ package and silently runs nothing.
 test:
-	uv run python manage.py test
+	uv run python manage.py test arnlabels scans siteconfig
 
 # OCR regression tests against real scans in media/documents/ (not checked
 # into git, so this only makes sense to run locally, never in CI). Excluded
