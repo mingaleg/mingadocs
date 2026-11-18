@@ -16,12 +16,13 @@ dependencies = [
     "zxing-cpp (>=3.1.1,<4.0.0)",
     "pydantic (>=2.13.4,<3.0.0)",
     "django-stubs-ext (>=6.1.0,<7.0.0)",
-    "pypdfium2 (>=5.13.0,<6.0.0)"
+    "pypdfium2 (>=5.13.0,<6.0.0)",
+    "gunicorn (>=23.0.0,<24.0.0)"
 ]
 
-[tool.poetry]
+[tool.uv]
 # Application, not a distributable library: don't install the project itself.
-package-mode = false
+package = false
 
 [dependency-groups]
 dev = [
