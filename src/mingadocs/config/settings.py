@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 
 import django_stubs_ext
+from django.core.exceptions import ImproperlyConfigured
 
 # Make the runtime classes that django-stubs types as generic
 # (``ModelForm[M]``, ``ModelAdmin[M]``, ``QuerySet[M]``, …) subscriptable, so
@@ -24,21 +25,37 @@ django_stubs_ext.monkeypatch()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
+# Everything below defaults to local development. A real deployment (see
+# nix/module.nix) configures itself through MINGADOCS_* environment variables.
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-# Set DJANGO_SECRET_KEY in the environment for any real deployment; the literal
-# below is only the throwaway development key (django-admin's own default form).
-SECRET_KEY = os.environ.get(
-    'DJANGO_SECRET_KEY',
-    'django-insecure-pio+6@g-sfnkizj9$$u%lue=0ttt5y0j4&&y$rkeg+pvs&ls4z',
-)
+def _env_path(name: str, default: Path) -> Path:
+    value = os.environ.get(name)
+    return Path(value) if value else default
+
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('MINGADOCS_DEBUG', '1') == '1'
 
-ALLOWED_HOSTS: list[str] = []
+# SECURITY WARNING: keep the secret key used in production secret!
+# MINGADOCS_SECRET_KEY_FILE (e.g. a systemd credential) wins over
+# DJANGO_SECRET_KEY; the literal below is only the throwaway development key
+# (django-admin's own default form), and is refused outside DEBUG.
+_INSECURE_DEV_KEY = 'django-insecure-pio+6@g-sfnkizj9$$u%lue=0ttt5y0j4&&y$rkeg+pvs&ls4z'
+_secret_key_file = os.environ.get('MINGADOCS_SECRET_KEY_FILE')
+if _secret_key_file:
+    SECRET_KEY = Path(_secret_key_file).read_text(encoding='utf-8').strip()
+else:
+    SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', _INSECURE_DEV_KEY)
+if not DEBUG and SECRET_KEY == _INSECURE_DEV_KEY:
+    raise ImproperlyConfigured(
+        'Set MINGADOCS_SECRET_KEY_FILE or DJANGO_SECRET_KEY when DEBUG is off.'
+    )
+
+# Comma-separated, e.g. "docs.example,docs.example.lan".
+ALLOWED_HOSTS: list[str] = [
+    h for h in os.environ.get('MINGADOCS_ALLOWED_HOSTS', '').split(',') if h
+]
 
 
 # Application definition
@@ -93,7 +110,7 @@ LABEL_TEMPLATE = 'AVERY_L4731REV'  # Avery Zweckform L4731REV-25
 # Uploaded / generated files: scanned page images and finalized document PDFs.
 # See docs/scan-workflow.md.
 MEDIA_URL = 'media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = _env_path('MINGADOCS_MEDIA_ROOT', BASE_DIR / 'media')
 
 
 # Database
@@ -102,7 +119,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': _env_path('MINGADOCS_DB_PATH', BASE_DIR / 'db.sqlite3'),
     }
 }
 
@@ -142,6 +159,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = 'static/'
+# Where `collectstatic` gathers files for the web server; the package build
+# runs it. Unset in development, where runserver serves them itself.
+_static_root = os.environ.get('MINGADOCS_STATIC_ROOT')
+if _static_root:
+    STATIC_ROOT = Path(_static_root)
 
 
 # Email
